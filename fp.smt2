@@ -1,4 +1,4 @@
-;; I'm following the example1.smt2 sent by sir as that matches closely to secure information flow verification using self-composition (the assertion is at the end and the assumption at the beginning). The self-composed program starts from the next line.
+;; Following the example1.smt2 sent by sir. The self-composed program starts from the next line.
 ;; assume(h' != h);
 ;; z = 1;
 ;; if (h) {x = 1;}
