@@ -1,4 +1,4 @@
-
+from z3 import *
 class Car():
     def __init__(self, is_vertical, base_pos, length, start, color):
 	self.is_vertical = is_vertical

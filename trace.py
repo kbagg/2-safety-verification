@@ -9,8 +9,9 @@ fp1 = Fixedpoint()
 fp1.register_relation(fun)
 fp1.register_relation(err.decl())
 
-x, i = z3.Ints('x, i')
-fp1.declare_var(x,i)
+x, i = z3.Ints('x i')
+l = [x, i]
+fp1.declare_var(*l) # Important to have variables in traces, to see diff, print ans without it.
 
 fp1.rule(fun(x, i), [x == 1, i == 0])
 fp1.rule(fun(x + 2, i + 1), fun(x, i))
@@ -26,7 +27,7 @@ print(ans.arg(0).children()[-1]) # The value of the last variable count, i.e. i 
 
 count = len(ans.children())-1 # length od trace - 1
 print(len(ans.children())-1) # number of states - 1 = number of steps taken. (Will use this in case over approximation is used as indicated by sir)
-
+print(fp1.help())
 # for model M'
 fp2 = Fixedpoint()
 

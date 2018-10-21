@@ -1,4 +1,4 @@
-
+from z3 import *
 mc = Function('mc', IntSort(), IntSort(), BoolSort())
 n, m, p = Ints('n m p')
 
