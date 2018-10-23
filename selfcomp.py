@@ -66,13 +66,36 @@ def relationalInduction(M, Msc, bad_sc):
     S.add(bad_proofob)
     S.add(trx)
     n = len(xs) // 2
+    vs = [z3.Var(i, si) for (i, si) in enumerate(M.sorts())]
     while S.check() == z3.sat:
         m = S.model()
         xm1 = [m.eval(xsi) for xsi in xs[:n]]
         xm2 = [m.eval(xsi) for xsi in xs[n:]]
         bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
         bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
-        print (fixedpoint(M, bad1))
+        print (xm1, xm2)
+        (r1, inv1) = fixedpoint(M, bad1)
+        print (r1, inv1)
+        if r1 == z3.unsat:
+            sub1 = zip(vs, xs[:n])
+            sub2 = zip(vs, xs[n:])
+            p1 = z3.substitute(inv1, *sub1)
+            p2 = z3.substitute(inv1, *sub2)
+            print (inv1, sub1, p1)
+            S.add(p1)
+            S.add(p2)
+            print (p1, p2)
+            continue
+        (r2, inv2) = fixedpoint(M, bad2)
+        print (r2, inv2)
+        if r2 == z3.unsat:
+            sub1 = zip(vs, xs[:n])
+            sub2 = zip(vs, xs[n:])
+            p1 = z3.substitute(inv2, *sub1)
+            p2 = z3.substitute(inv2, *sub2)
+            S.add(p1)
+            S.add(p2)
+            print (p1, p2)
         break
     S.pop()
     
@@ -98,12 +121,16 @@ def fixedpoint(M, bad):
     fp.rule(inv_xsp, M.tr(xs, xsp) + [inv_xs])
     fp.rule(err(), bad(xs) + [inv_xs])
 
-    print (fp.query(err))
-    inv = fp.get_answer()
-    body = inv.body()
-    print (z3.is_eq(body))
-    expr = (body.arg(1))
-    print (z3.substitute_vars(expr, *xs))
+    if fp.query(err) == z3.unsat:
+        inv = fp.get_answer()
+        print (inv)
+        assert inv.is_forall()
+        body = inv.body()
+        assert z3.is_eq(body)
+        expr = (body.arg(1))
+        return (z3.unsat, expr)
+    else:
+        return (z3.sat, None)
 
 if __name__ == '__main__':
     M = TransitionSystem()
