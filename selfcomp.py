@@ -99,9 +99,11 @@ def fixedpoint(M, bad):
     fp.rule(err(), bad(xs) + [inv_xs])
 
     print (fp.query(err))
-    print (fp.get_answer())
-    print (help(fp.fixedpoint))
-    # print (fp.get_answer())
+    inv = fp.get_answer()
+    body = inv.body()
+    print (z3.is_eq(body))
+    expr = (body.arg(1))
+    print (z3.substitute_vars(expr, *xs))
 
 if __name__ == '__main__':
     M = TransitionSystem()
