@@ -44,7 +44,7 @@ class SelfComposedTransitionSystem(object):
 
 def fixedpoint(M, bad):
     fp = z3.Fixedpoint()
-    options = {'engine':'pdr', 'pdr.farkas': True}
+    options = {'engine':'spacer'}
     fp.set(**options)
 
     xs = M.variables()
@@ -78,4 +78,4 @@ if __name__ == '__main__':
     def bad_sc(xs):
         return [z3.And(xs[0] == xs[2], xs[1] != xs[3])]
     # The following times out.
-    # fixedpoint(Msc, bad_sc)
+    fixedpoint(Msc, bad_sc)
