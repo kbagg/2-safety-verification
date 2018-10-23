@@ -1,4 +1,5 @@
 import z3
+import itertools
 
 class TransitionSystem(object):
     def variables(self, suffix = ''):
@@ -42,6 +43,39 @@ class SelfComposedTransitionSystem(object):
         xsp2 = xsp[m:]
         return self.M.tr(xs1, xsp1) + self.M.tr(xs2, xsp2)
 
+def relationalInduction(M, Msc, bad_sc):
+    xs = Msc.variables()
+    xsp = Msc.variables('prime')
+
+    bad = z3.simplify(z3.And(bad_sc(xs)))
+    init = z3.And(Msc.init(xs))
+    check = z3.simplify(z3.And(init, bad))
+
+    S = z3.Solver()
+    S.push()
+    S.add(check)
+    rInit = (S.check())
+    S.pop()
+    assert (rInit == z3.unsat)
+
+    S.push()
+    bad_assume = z3.simplify(z3.And(bad_sc(xs)))
+    bad_proofob = z3.simplify(z3.And(bad_sc(xsp)))
+    trx = z3.simplify(z3.And(Msc.tr(xs, xsp)))
+    S.add(bad_assume)
+    S.add(bad_proofob)
+    S.add(trx)
+    n = len(xs) // 2
+    while S.check() == z3.sat:
+        m = S.model()
+        xm1 = [m.eval(xsi) for xsi in xs[:n]]
+        xm2 = [m.eval(xsi) for xsi in xs[n:]]
+        bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
+        bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
+        print (fixedpoint(M, bad1))
+        break
+    S.pop()
+    
 def fixedpoint(M, bad):
     fp = z3.Fixedpoint()
     options = {'engine':'spacer'}
@@ -64,18 +98,21 @@ def fixedpoint(M, bad):
     fp.rule(inv_xsp, M.tr(xs, xsp) + [inv_xs])
     fp.rule(err(), bad(xs) + [inv_xs])
 
-    print (str(fp))
     print (fp.query(err))
+    print (fp.get_answer())
+    print (help(fp.fixedpoint))
     # print (fp.get_answer())
 
 if __name__ == '__main__':
     M = TransitionSystem()
     def bad(xs):
         return [xs[0] > xs[1]]
-    fixedpoint(M, bad)
+    #fixedpoint(M, bad)
 
     Msc = SelfComposedTransitionSystem(M)
     def bad_sc(xs):
         return [z3.And(xs[0] == xs[2], xs[1] != xs[3])]
     # The following times out.
-    fixedpoint(Msc, bad_sc)
+    #fixedpoint(Msc, bad_sc)
+
+    relationalInduction(M, Msc, bad_sc)
