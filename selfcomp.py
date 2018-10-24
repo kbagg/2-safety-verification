@@ -66,7 +66,6 @@ def relationalInduction(M, Msc, bad_sc):
     S.add(bad_proofob)
     S.add(trx)
     n = len(xs) // 2
-    vs = [z3.Var(i, si) for (i, si) in enumerate(M.sorts())]
     while S.check() == z3.sat:
         m = S.model()
         xm1 = [m.eval(xsi) for xsi in xs[:n]]
@@ -74,29 +73,25 @@ def relationalInduction(M, Msc, bad_sc):
         bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
         bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
         print (xm1, xm2)
-        (r1, inv1) = fixedpoint(M, bad1)
-        print (r1, inv1)
+        (r1, vs1, inv1) = fixedpoint(M, bad1)
         if r1 == z3.unsat:
-            sub1 = zip(vs, xs[:n])
-            sub2 = zip(vs, xs[n:])
+            sub1 = zip(vs1, xs[:n])
+            sub2 = zip(vs1, xs[n:])
             p1 = z3.substitute(inv1, *sub1)
             p2 = z3.substitute(inv1, *sub2)
-            print (inv1, sub1, p1)
             S.add(p1)
             S.add(p2)
             print (p1, p2)
             continue
-        (r2, inv2) = fixedpoint(M, bad2)
-        print (r2, inv2)
+        (r2, vs2, inv2) = fixedpoint(M, bad2)
         if r2 == z3.unsat:
-            sub1 = zip(vs, xs[:n])
-            sub2 = zip(vs, xs[n:])
+            sub1 = zip(vs2, xs[:n])
+            sub2 = zip(vs2, xs[n:])
             p1 = z3.substitute(inv2, *sub1)
             p2 = z3.substitute(inv2, *sub2)
             S.add(p1)
             S.add(p2)
             print (p1, p2)
-        break
     S.pop()
     
 def fixedpoint(M, bad):
@@ -123,14 +118,17 @@ def fixedpoint(M, bad):
 
     if fp.query(err) == z3.unsat:
         inv = fp.get_answer()
-        print (inv)
         assert inv.is_forall()
         body = inv.body()
         assert z3.is_eq(body)
+        fapp = body.arg(0)
+        assert (z3.is_app(fapp))
+        args = [fapp.arg(i) for i in range(body.num_args())]
+        assert len(args) == len(xs)
         expr = (body.arg(1))
-        return (z3.unsat, expr)
+        return (z3.unsat, args, expr)
     else:
-        return (z3.sat, None)
+        return (z3.sat, None, None)
 
 if __name__ == '__main__':
     M = TransitionSystem()
