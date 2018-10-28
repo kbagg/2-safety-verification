@@ -1,4 +1,4 @@
-
+from z3 import *
 class Car():
     def __init__(self, is_vertical, base_pos, length, start, color):
 	self.is_vertical = is_vertical
@@ -46,7 +46,8 @@ def bound(i):
     return Const(cars[i].color, bv3)
 
 fp = Fixedpoint()
-fp.set(generate_explanations=True)
+fp.set(engine = 'datalog')
+fp.set(datalog_generate_explanations = True)
 fp.declare_var([bound(i) for i in range(num_cars)])
 fp.register_relation(state)
 
