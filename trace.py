@@ -25,7 +25,7 @@ ans = fp1.get_answer()
 count = ans.arg(0).children()[-1] # assuming count is the last varibale int he list of variables
 print(ans.arg(0).children()[-1]) # The value of the last variable count, i.e. i in this case
 
-count = len(ans.children())-1 # length od trace - 1
+count = len(ans.children())-1 # length of trace - 1
 print(len(ans.children())-1) # number of states - 1 = number of steps taken. (Will use this in case over approximation is used as indicated by sir)
 print(fp1.help())
 # for model M'

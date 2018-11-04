@@ -76,14 +76,11 @@ def relationalInduction(M, Msc, bad_sc):
     S.add(trx)
     n = len(xs) // 2
     while S.check() == z3.sat:
-    	print("HEYAA")
         m = S.model()
         xm1 = [m.eval(xsi) for xsi in xs[:n]]
         xm2 = [m.eval(xsi) for xsi in xs[n:]]
         bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
         bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
-        print (xm1, xm2)
-        break
         (r1, vs1, inv1) = fixedpoint(M, bad1)
         if r1 == z3.unsat:
             sub1 = zip(vs1, xs[:n])
@@ -103,6 +100,7 @@ def relationalInduction(M, Msc, bad_sc):
             S.add(p1)
             S.add(p2)
             print (p1, p2)
+        break
     S.pop()
     
 def fixedpoint(M, bad):
@@ -125,9 +123,9 @@ def fixedpoint(M, bad):
     inv_xsp = inv(*xsp)
     fp.rule(inv_xs, M.init(xs))
     fp.rule(inv_xsp, M.tr(xs, xsp) + [inv_xs])
+    fp.rule(err(), bad(xs) + [inv_xs])
     print("RULES:")
     print(fp.get_rules())
-    fp.rule(err(), bad(xs) + [inv_xs])
 
     if fp.query(err) == z3.unsat:
         inv = fp.get_answer()
