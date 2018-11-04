@@ -114,6 +114,8 @@ def fixedpoint(M, bad):
     inv_xsp = inv(*xsp)
     fp.rule(inv_xs, M.init(xs))
     fp.rule(inv_xsp, M.tr(xs, xsp) + [inv_xs])
+    print("RULES:")
+    print(fp.get_rules())
     fp.rule(err(), bad(xs) + [inv_xs])
 
     if fp.query(err) == z3.unsat:
@@ -134,7 +136,7 @@ if __name__ == '__main__':
     M = TransitionSystem()
     def bad(xs):
         return [xs[0] > xs[1]]
-    #fixedpoint(M, bad)
+    fixedpoint(M, bad)
 
     Msc = SelfComposedTransitionSystem(M)
     def bad_sc(xs):
