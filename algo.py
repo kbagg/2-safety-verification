@@ -11,6 +11,7 @@ class TransitionSystem(object):
 			s = ''
 		xs = [z3.Int('x' + s), z3.Int('y' + s)]
 
+		self.suffix = s
 		self.variables = xs
 		self.sorts = [z3.IntSort(), z3.IntSort()]
 		self.init = [xs[0] == 0, xs[1] == 1]
@@ -42,6 +43,8 @@ class TransitionSystem(object):
 class SelfComposedTransitionSystem(object):
 
 	def __init__(self, model, suffix = ''):
+
+		self.suffix = suffix
 		self.model = model
 		v1 = model.addSuffix('1' + suffix)
 		v2 = model.addSuffix('2' + suffix)
@@ -51,10 +54,10 @@ class SelfComposedTransitionSystem(object):
 		self.tr =  model.transition(v1) + model.transition(v2)
 		self.bad = [z3.And(v1[0] == v2[0], v1[1] != v2[1])]
 
-	# def variables(self, suffix = ''):
-	#     v1 = self.M.variables('_1' + suffix)
-	#     v2 = self.M.variables('_2' + suffix)
-	#     return v1 + v2
+	def addSuffix(self, suffix = ''):
+		v1 = self.model.addSuffix('1' + suffix)
+		v2 = self.model.addSuffix('2' + suffix)
+		return v1 + v2
 
 	# def sorts(self):
 	# 	return self.M.sorts() + self.M.sorts()
@@ -84,12 +87,29 @@ def getLength(ans):
 	return count
 
 def addCounter(M):
-	M.variables
+	M.variables = M.variables + [z3.Int('counter' + M.suffix)]
+	M.sorts = M.sorts + [z3.IntSort()]
+	M.init = M.init + [M.variables[-1] == 0]
+	M.tr = M.tr + [M.variables[-1] + 1]
 
-if __name__ == '__main__':
+def relationalInduction():
+
 	M = TransitionSystem()
 	# print(vars(M))
 	Msc = SelfComposedTransitionSystem(M)
 	# print(vars(Msc))
+	addCounter(M)
+	addCounter(Msc)
+	# print(vars(M))
+	# print(vars(Msc))
 
-	
+	# Solve Msc for bad in one step
+	xs = Msc.variables
+	xsp = Msc.addSuffix('prime')
+	# print(xsp)
+
+
+
+if __name__ == '__main__':
+
+	relationalInduction()
