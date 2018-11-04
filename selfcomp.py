@@ -51,6 +51,10 @@ def relationalInduction(M, Msc, bad_sc):
     init = z3.And(Msc.init(xs))
     check = z3.simplify(z3.And(init, bad))
 
+    # print(bad)
+    # print(init)
+    # print(check)
+
     S = z3.Solver()
     S.push()
     S.add(check)
@@ -61,18 +65,25 @@ def relationalInduction(M, Msc, bad_sc):
     S.push()
     bad_assume = z3.simplify(z3.And(bad_sc(xs)))
     bad_proofob = z3.simplify(z3.And(bad_sc(xsp)))
+    # print(bad_assume)
+    # print(bad_proofob)
+    # return
     trx = z3.simplify(z3.And(Msc.tr(xs, xsp)))
+    # print(trx)
+    # return
     S.add(bad_assume)
     S.add(bad_proofob)
     S.add(trx)
     n = len(xs) // 2
     while S.check() == z3.sat:
+    	print("HEYAA")
         m = S.model()
         xm1 = [m.eval(xsi) for xsi in xs[:n]]
         xm2 = [m.eval(xsi) for xsi in xs[n:]]
         bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
         bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
         print (xm1, xm2)
+        break
         (r1, vs1, inv1) = fixedpoint(M, bad1)
         if r1 == z3.unsat:
             sub1 = zip(vs1, xs[:n])
@@ -136,7 +147,7 @@ if __name__ == '__main__':
     M = TransitionSystem()
     def bad(xs):
         return [xs[0] > xs[1]]
-    fixedpoint(M, bad)
+    # fixedpoint(M, bad)
 
     Msc = SelfComposedTransitionSystem(M)
     def bad_sc(xs):

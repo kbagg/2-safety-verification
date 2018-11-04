@@ -25,9 +25,6 @@ class TransitionSystem(object):
 	    	s = ''
 	    return [z3.Int('x' + s), z3.Int('y' + s)]
 
-	# def sorts(self):
-	# 	return [z3.IntSort(), z3.IntSort()]
-
 	def initialize(self, xs):
 	    "Init(x, y) = (x == 0 && y == 1)"
 	    return [xs[0] == 0, xs[1] == 1]
@@ -36,9 +33,6 @@ class TransitionSystem(object):
 	    "Tr(x, y, x', y') = (x' == x + 1 && y' == x + y)"
 	    return [xs[0] + 1,
 	            xs[0] + xs[1]]
-
-	# def bad(self, xs):
-	# 	return [xs[0] > xs[1]]
 
 class SelfComposedTransitionSystem(object):
 
@@ -59,23 +53,8 @@ class SelfComposedTransitionSystem(object):
 		v2 = self.model.addSuffix('2' + suffix)
 		return v1 + v2
 
-	# def sorts(self):
-	# 	return self.M.sorts() + self.M.sorts()
-
-	# def init(self, xs):
-	#     m = len(xs) // 2
-	#     xs1 = xs[:m]
-	#     xs2 = xs[m:]
-	#     return self.M.init(xs1) + self.M.init(xs2)
-
-	# def tr(self, xs):
-	#     m = len(xs) // 2
-	#     xs1  = xs[:m]
-	#     xs2  = xs[m:]
-	#     return self.M.tr(xs1) + self.M.tr(xs2)
-
-	# def bad_sc(self, xs):
-	# 	return [z3.And(xs[0] == xs[2], xs[1] != xs[3])]
+	def bad_sc(self, xs):
+		return [z3.And(xs[0] == xs[2], xs[1] != xs[3])]
 
 def getLength(ans):
 	count = 0
@@ -95,19 +74,64 @@ def addCounter(M):
 def relationalInduction():
 
 	M = TransitionSystem()
-	# print(vars(M))
 	Msc = SelfComposedTransitionSystem(M)
-	# print(vars(Msc))
-	addCounter(M)
-	addCounter(Msc)
-	# print(vars(M))
-	# print(vars(Msc))
 
-	# Solve Msc for bad in one step
 	xs = Msc.variables
 	xsp = Msc.addSuffix('prime')
-	# print(xsp)
+	print(xs)
+	print(xsp)
 
+	bad = z3.simplify(z3.And(Msc.bad))
+	init = z3.simplify(z3.And(Msc.init))
+	check = z3.simplify(z3.And(init, bad))
+
+	S = z3.Solver()
+	S.push()
+	S.add(check)
+	rInit = (S.check())
+	S.pop()
+	assert (rInit == z3.unsat)
+
+	S.push()
+
+	bad_assume = bad
+	bad_proofob = z3.simplify(z3.And(Msc.bad_sc(xsp)))
+	trx = z3.simplify(z3.And([xsp[i]==Msc.tr[i] for i in range(len(xs))]))
+
+	S.add(bad_assume)
+	S.add(bad_proofob)
+	S.add(trx)
+
+	n = len(xsp) // 2
+	while S.check() == z3.sat:
+		m = S.model()
+		xm1 = [m.eval(xsi) for xsi in xs[:n]]
+		xm2 = [m.eval(xsi) for xsi in xs[n:]]
+		bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
+		bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
+
+		(r1, vs1, inv1) = fixedpoint(M, bad1)
+		if r1 == z3.unsat:
+			sub1 = zip(vs1, xs[:n])
+			sub2 = zip(vs1, xs[n:])
+			p1 = z3.substitute(inv1, *sub1)
+			p2 = z3.substitute(inv1, *sub2)
+			S.add(p1)
+			S.add(p2)
+			print (p1, p2)
+			continue
+		(r2, vs2, inv2) = fixedpoint(M, bad2)
+		if r2 == z3.unsat:
+			sub1 = zip(vs2, xs[:n])
+			sub2 = zip(vs2, xs[n:])
+			p1 = z3.substitute(inv2, *sub1)
+			p2 = z3.substitute(inv2, *sub2)
+			S.add(p1)
+			S.add(p2)
+			print (p1, p2)
+	S.pop()
+
+def fixedpoint(M, bad):
 
 
 if __name__ == '__main__':
