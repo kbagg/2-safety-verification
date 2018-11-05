@@ -79,8 +79,8 @@ def relationalInduction():
 
 	xs = Msc.variables
 	xsp = Msc.addSuffix('prime')
-	print(xs)
-	print(xsp)
+	# print(xs)
+	# print(xsp)
 
 	bad = z3.simplify(z3.And(Msc.bad))
 	init = z3.simplify(z3.And(Msc.init))
@@ -100,8 +100,8 @@ def relationalInduction():
 	trx = z3.simplify(z3.And([xsp[i]==Msc.tr[i] for i in range(len(xs))]))
 
 	S.add(bad_assume)
-	print(bad_assume)
-	print(bad_proofob)
+	# print(bad_assume)
+	# print(bad_proofob)
 	S.add(bad_proofob)
 	S.add(trx)
 
@@ -114,6 +114,7 @@ def relationalInduction():
 		bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
 
 		r1, no1, count1 = getLength(M, bad1)
+		# print("returned from get length")
 		# print(no)
 		if r1 == z3.unsat:
 			sub1 = zip(M.variables, xs[:n])
@@ -124,6 +125,7 @@ def relationalInduction():
 			continue
 
 		r2, no2, count2 = checkLength(M, bad2, count1)
+		# print("returned from check length")
 		if r2 == z3.unsat:
 			sub1 = zip(M.variables, xs[:n])
 			p1 = z3.substitute(*(no2 + sub1))
