@@ -87,6 +87,7 @@ def relationalInduction(M, Msc, bad_sc):
             sub2 = zip(vs1, xs[n:])
             p1 = z3.substitute(inv1, *sub1)
             p2 = z3.substitute(inv1, *sub2)
+            print("P!: ", p1)
             S.add(p1)
             S.add(p2)
             print (p1, p2)
@@ -137,6 +138,7 @@ def fixedpoint(M, bad):
         args = [fapp.arg(i) for i in range(body.num_args())]
         assert len(args) == len(xs)
         expr = (body.arg(1))
+        print(z3.unsat, args, expr)
         return (z3.unsat, args, expr)
     else:
         return (z3.sat, None, None)

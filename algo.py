@@ -100,6 +100,8 @@ def relationalInduction():
 	trx = z3.simplify(z3.And([xsp[i]==Msc.tr[i] for i in range(len(xs))]))
 
 	S.add(bad_assume)
+	print(bad_assume)
+	print(bad_proofob)
 	S.add(bad_proofob)
 	S.add(trx)
 
@@ -111,30 +113,86 @@ def relationalInduction():
 		bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
 		bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
 
-		print(getLength(M, bad1))
-		return
-		(r1, vs1, inv1) = fixedpoint(M, bad1)
+		r1, no1, count1 = getLength(M, bad1)
+		# print(no)
 		if r1 == z3.unsat:
-			sub1 = zip(vs1, xs[:n])
-			sub2 = zip(vs1, xs[n:])
-			p1 = z3.substitute(inv1, *sub1)
-			p2 = z3.substitute(inv1, *sub2)
-			S.add(p1)
-			S.add(p2)
-			print (p1, p2)
+			sub1 = zip(M.variables, xs[:n])
+			p1 = z3.substitute(*(no1 + sub1))
+			p2 = z3.substitute(*(no1 + sub1))
+			S.add(z3.Not(p1))
+			S.add(z3.Not(p2))
 			continue
-		(r2, vs2, inv2) = fixedpoint(M, bad2)
+
+		r2, no2, count2 = checkLength(M, bad2, count1)
 		if r2 == z3.unsat:
-			sub1 = zip(vs2, xs[:n])
-			sub2 = zip(vs2, xs[n:])
-			p1 = z3.substitute(inv2, *sub1)
-			p2 = z3.substitute(inv2, *sub2)
-			S.add(p1)
-			S.add(p2)
-			print (p1, p2)
+			sub1 = zip(M.variables, xs[:n])
+			p1 = z3.substitute(*(no2 + sub1))
+			p2 = z3.substitute(*(no1 + sub1))
+			S.add(z3.Not(p1))
+			S.add(z3.Not(p2))
+			continue
+
+		print("UNSAFE")
+		return
+
+	print("SAFE")
 	S.pop()
 
 def getLength(M, bad):
+	fp = z3.Fixedpoint()
+	options = {'engine':'spacer'}
+	fp.set(**options)
+
+	xs = M.variables
+
+	sorts = M.sorts + [z3.BoolSort()]
+	inv = z3.Function('inv', *sorts)
+	err = z3.Bool('err')
+
+	fp.register_relation(inv)
+	fp.register_relation(err.decl())
+	fp.declare_var(*xs)
+
+	fp.rule(inv(*xs), M.init)
+	fp.rule(inv(*M.tr), inv(*xs))
+	fp.rule(err, bad(xs) + [inv(*xs)])
+
+	r = fp.query(err)
+	if r == z3.unsat:
+		return (z3.unsat, bad(xs), None)
+	else:
+		return (z3.sat, bad(xs), len(fp.get_answer().children()))
+
+def checkLength(M, bad, count):
+	fp = z3.Fixedpoint()
+	options = {'engine': 'spacer'}
+	fp.set(**options)
+
+	addCounter(M)
+
+	xs = M.variables
+	
+	sorts = M.sorts + [z3.BoolSort()]
+	inv = z3.Function('inv', *sorts)
+	err = z3.Bool('err')
+
+	fp.register_relation(inv)
+	fp.register_relation(err.decl())
+	fp.declare_var(*xs)
+
+	bad_state = [z3.And(bad(xs) + [xs[-1] == count])]
+
+	fp.rule(inv(*xs), M.init)
+	fp.rule(inv(*M.tr), inv(*xs))
+	fp.rule(err, bad_state + [inv(*xs)])
+
+	r = fp.query(err)
+	if r == z3.unsat:
+		return (z3.unsat, bad(xs), None)
+	else:
+		return (z3.sat, bad(xs), len(inv.children()))
+
+def getLength1(M, bad):
 	fp = z3.Fixedpoint()
 	options = {'engine':'spacer'}
 	fp.set(**options)
@@ -158,61 +216,32 @@ def getLength(M, bad):
 	inv_xs = inv(*xs)
 	inv_xsp = inv(*xsp)
 
+	print(inv_xs, inv_xsp)
+
 	fp.rule(inv_xs, M.init)
+	print(fp.get_rules())
 	fp.rule(inv_xsp, trx + [inv_xs])
 	fp.rule(err(), bad(xs) + [inv_xs])
 
-	if fp.query(err) == z3.unsat:
+	r = fp.query(err) == z3.unsat
+	if r:
 		inv = fp.get_answer()
+		print("INV:")
+		print(inv)
 		assert inv.is_forall()
 		body = inv.body()
 		assert z3.is_eq(body)
+		print("BODY:", body)
 		fapp = body.arg(0)
 		assert (z3.is_app(fapp))
 		args = [fapp.arg(i) for i in range(body.num_args())]
 		assert len(args) == len(xs)
 		expr = (body.arg(1))
+		print(z3.unsat, args, expr)
 		return (z3.unsat, args, expr)
 	else:
+		print("BAche chaide ne")
 		return (z3.sat, len(inv.children())-1, None)
-
-def fixedpoint(M, bad):
-	fp = z3.Fixedpoint()
-	# options = {'engine':'spacer'}
-	# fp.set(**options)
-
-	# xs = M.variables
-	# xsp = M.addSuffix('prime')
-	# sorts = M.sorts + [z3.BoolSort()]
-	# inv = z3.Function('inv', *sorts)
-	# err = z3.Function('err', z3.BoolSort())
-
-	# fp.register_relation(inv)
-	# fp.register_relation(err)
-	# for zi in xs + xsp:
-	# 	fp.declare_var(zi)
-
-	# inv_xs = inv(*xs)
-	# inv_xsp = inv(*xsp)
-	# fp.rule(inv_xs, M.init(xs))
-	# fp.rule(inv_xsp, M.tr(xs, xsp) + [inv_xs])
-	# print("RULES:")
-	# print(fp.get_rules())
-	# fp.rule(err(), bad(xs) + [inv_xs])
-
-	# if fp.query(err) == z3.unsat:
-	# 	inv = fp.get_answer()
-	# 	assert inv.is_forall()
-	# 	body = inv.body()
-	# 	assert z3.is_eq(body)
-	# 	fapp = body.arg(0)
-	# 	assert (z3.is_app(fapp))
-	# 	args = [fapp.arg(i) for i in range(body.num_args())]
-	# 	assert len(args) == len(xs)
-	# 	expr = (body.arg(1))
-	# 	return (z3.unsat, args, expr)
-	# else:
-	return (z3.sat, None, None)
 
 if __name__ == '__main__':
 

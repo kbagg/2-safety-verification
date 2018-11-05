@@ -14,13 +14,15 @@ l = [x, i]
 fp1.declare_var(*l) # Important to have variables in traces, to see diff, print ans without it.
 
 fp1.rule(fun(x, i), [x == 1, i == 0])
-fp1.rule(fun(x + 2, i + 1), fun(x, i))
+print(fp1.get_rules())
+fp1.rule(fun(x + 2, i + x), fun(x, i))
 
-fp1.rule(err, [fun(x, i), i >= x]) # find a way to encode error relation/function-------------found!!!
-
+fp1.rule(err, [fun(x, i), x == 0, i == 0]) # find a way to encode error relation/function-------------found!!!
+print(fp1.get_rules())
 # Query for all other variables and calculate the count, i.e number of steps take in M that will be used to solve model M'
 fp1.query(And(fun(x, i), x==9))
 ans = fp1.get_answer()
+print(ans)
 
 count = ans.arg(0).children()[-1] # assuming count is the last varibale int he list of variables
 print(ans.arg(0).children()[-1]) # The value of the last variable count, i.e. i in this case
