@@ -46,8 +46,12 @@ def bound(i):
     return Const(cars[i].color, bv3)
 
 fp = Fixedpoint()
+<<<<<<< HEAD
 fp.set(engine = 'datalog')
 fp.set(datalog_generate_explanations = True)
+=======
+fp.set(generate_explanations=True)
+>>>>>>> 2ca60cd8aa1a3263a3db6d0ebc19aebab1e7bbad
 fp.declare_var([bound(i) for i in range(num_cars)])
 fp.register_relation(state)
 

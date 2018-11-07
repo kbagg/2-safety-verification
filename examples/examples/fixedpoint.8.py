@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 
+=======
+from z3 import *
+>>>>>>> 2ca60cd8aa1a3263a3db6d0ebc19aebab1e7bbad
 mc = Function('mc', IntSort(), IntSort(), BoolSort())
 n, m, p = Ints('n m p')
 
