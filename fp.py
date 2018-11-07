@@ -45,7 +45,7 @@ list1 = [x, y, i]  										# List of variables of first model
 
 fp1.rule(tr(x, y, i), [x == 0, y > 1, i == 0])
 fp1.rule(tr(x + 1, y + x, i + 1), tr(x, y, i))
-# fp1.rule(And(False), [tr(x, y, i), x >= y]) 			# False has to be added as And(False) to work in z3
+fp1.rule(And(False), [tr(x, y, i), x >= y]) 			# False has to be added as And(False) to work in z3
 
 # model M' (M_d)
 fp2 = Fixedpoint()
