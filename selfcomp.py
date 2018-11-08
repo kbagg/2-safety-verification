@@ -118,14 +118,19 @@ def fixedpoint(M, bad):
 
     if fp.query(err) == z3.unsat:
         inv = fp.get_answer()
+        print("INV:: ", inv)
         assert inv.is_forall()
         body = inv.body()
         assert z3.is_eq(body)
+        print("BODY:: ", body)
         fapp = body.arg(0)
+        print("FAPP:: ", fapp)
         assert (z3.is_app(fapp))
         args = [fapp.arg(i) for i in range(body.num_args())]
+        print("ARGS:: ", args)
         assert len(args) == len(xs)
         expr = (body.arg(1))
+        print("EXPR:: ", expr)
         return (z3.unsat, args, expr)
     else:
         return (z3.sat, None, None)

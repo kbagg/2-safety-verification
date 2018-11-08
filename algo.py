@@ -95,7 +95,7 @@ def relationalInduction():
 
 	S.push()
 
-	bad_assume = bad
+	bad_assume = bad                                                             #Shouldn't bad be a function defined over xs?
 	bad_proofob = z3.simplify(z3.And(Msc.bad_sc(xsp)))
 	trx = z3.simplify(z3.And([xsp[i]==Msc.tr[i] for i in range(len(xs))]))
 
@@ -113,23 +113,27 @@ def relationalInduction():
 		bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
 		bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
 
-		r1, no1, count1 = getLength(M, bad1)
-		# print("returned from get length")
-		# print(no)
-		if r1 == z3.unsat:
+		r1, count1 = getLength(M, bad1)
+                no1 = bad1(M.variables)
+                
+                if r1 == z3.unsat:
 			sub1 = zip(M.variables, xs[:n])
-			p1 = z3.substitute(*(no1 + sub1))
-			p2 = z3.substitute(*(no1 + sub1))
+                        sub2 = zip(M.variables, xs[n:])
+                        p1 = z3.substitute(*(no1 + sub1))
+			p2 = z3.substitute(*(no1 + sub2))
 			S.add(z3.Not(p1))
 			S.add(z3.Not(p2))
 			continue
 
-		r2, no2, count2 = checkLength(M, bad2, count1)
-		# print("returned from check length")
-		if r2 == z3.unsat:
+		r2, count2 = checkLength(M, bad2, count1)                         # We don't need to call this when count1 == None
+                no2 = bad2(M.variables)
+                # r2 = checkLengthBMC(M, bad2, count1)
+                
+                if r2 == z3.unsat:
 			sub1 = zip(M.variables, xs[:n])
-			p1 = z3.substitute(*(no2 + sub1))
-			p2 = z3.substitute(*(no1 + sub1))
+                        sub2 = zip(M.variables, xs[n:])
+                        p1 = z3.substitute(*(no2 + sub1))
+			p2 = z3.substitute(*(no2 + sub1))
 			S.add(z3.Not(p1))
 			S.add(z3.Not(p2))
 			continue
@@ -161,9 +165,9 @@ def getLength(M, bad):
 
 	r = fp.query(err)
 	if r == z3.unsat:
-		return (z3.unsat, bad(xs), None)
+		return (z3.unsat, None)
 	else:
-		return (z3.sat, bad(xs), len(fp.get_answer().children()))
+		return (z3.sat, len(fp.get_answer().children()))
 
 def checkLength(M, bad, count):
 	fp = z3.Fixedpoint()
@@ -190,10 +194,31 @@ def checkLength(M, bad, count):
 
 	r = fp.query(err)
 	if r == z3.unsat:
-		return (z3.unsat, bad(xs), None)
+		return (z3.unsat, None)
 	else:
-		return (z3.sat, bad(xs), len(inv.children()))
+		return (z3.sat, len(inv.children()))
 
+# I don't think we need a fixed point engine for doing checkLength
+def checkLengthBMC(M, bad, count):
+        x = []
+        for i in range(count):
+                x.append(M.addSuffix(str(i)))
+
+	bad = z3.simplify(z3.And(bad(x[-1])))
+	init = z3.simplify(z3.And(M.initialize(x[0])))
+	trx = True
+
+        for i in range(count-1):
+                temp = z3.And(*[xi == xpi for (xi, xpi) in itertools.izip(x[i], x[i+1])])
+                trx = z3.And(trx, temp)
+
+	S = z3.Solver()
+	S.add(init)
+        S.add(trx)
+        S.add(bad)
+	rBMC = (S.check())
+	return rBMC
+        
 def getLength1(M, bad):
 	fp = z3.Fixedpoint()
 	options = {'engine':'spacer'}
