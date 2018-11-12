@@ -57,7 +57,7 @@ class SelfComposedTransitionSystem(object):
 	def bad_sc(self, xs):
 		return [z3.And(xs[0] == xs[2], xs[1] != xs[3])]
 
-def getLength(ans):
+def getLength2(ans):
 	count = 0
 	last_and = ans.arg(0).children()[-1]
 	trace = last_and.children()[1]
@@ -107,35 +107,50 @@ def relationalInduction():
 
 	n = len(xsp) // 2
 	while S.check() == z3.sat:
-		m = S.model()
+                #print "Msc CounterExample Found"
+                m = S.model()
 		xm1 = [m.eval(xsi) for xsi in xs[:n]]
 		xm2 = [m.eval(xsi) for xsi in xs[n:]]
 		bad1 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm1, xs)])]
 		bad2 = lambda xs: [z3.And(*[xi == xmi for (xi, xmi) in itertools.izip(xm2, xs)])]
 
-		r1, count1 = getLength(M, bad1)
-                no1 = bad1(M.variables)
+		#r1, count1 = getLength(M, bad1)
+                #no1 = bad1(M.variables)
+                r1, arg1, expr1 = getLength1(M, bad1)
                 
                 if r1 == z3.unsat:
-			sub1 = zip(M.variables, xs[:n])
-                        sub2 = zip(M.variables, xs[n:])
-                        p1 = z3.substitute(*(no1 + sub1))
-			p2 = z3.substitute(*(no1 + sub2))
-			S.add(z3.Not(p1))
-			S.add(z3.Not(p2))
+			#sub1 = zip(M.variables, xs[:n])
+                        #sub2 = zip(M.variables, xs[n:])
+                        sub1 = zip(arg1, xs[:n])
+                        sub2 = zip(arg1, xs[n:])
+                        #p1 = z3.substitute(*(no1 + sub1))
+			#p2 = z3.substitute(*(no1 + sub2))
+                        p1 = z3.substitute(expr1, *sub1)
+			p2 = z3.substitute(expr1, *sub2)
+                        #S.add(z3.Not(p1))
+			#S.add(z3.Not(p2))
+                        S.add(p1)
+			S.add(p2)
 			continue
 
-		r2, count2 = checkLength(M, bad2, count1)                         # We don't need to call this when count1 == None
+		#r2, count2 = checkLength(M, bad2, arg1)                         # arg1 stores the value of length when r1 is sat
                 no2 = bad2(M.variables)
-                # r2 = checkLengthBMC(M, bad2, count1)
+                #r2, arg2, expr2 = checkLength1(M, bad2, arg1)
+                r2, arg2, expr2 = checkLengthBMC(M, bad2, arg1)
                 
                 if r2 == z3.unsat:
-			sub1 = zip(M.variables, xs[:n])
-                        sub2 = zip(M.variables, xs[n:])
-                        p1 = z3.substitute(*(no2 + sub1))
-			p2 = z3.substitute(*(no2 + sub1))
-			S.add(z3.Not(p1))
-			S.add(z3.Not(p2))
+                        #sub1 = zip(M.variables, xs[:n])
+                        #sub2 = zip(M.variables, xs[n:])
+                        sub1 = zip(arg2[:n], xs[:n])
+                        sub2 = zip(arg2[n:], xs[n:])
+                        #p1 = z3.substitute(*(no2 + sub1))
+			#p2 = z3.substitute(*(no2 + sub2))
+                        p1 = z3.substitute(expr2, sub1)
+			p2 = z3.substitute(expr2, sub2)
+			#S.add(z3.Not(p1))
+			#S.add(z3.Not(p2))
+                        S.add(p1)
+			S.add(p2)
 			continue
 
 		print("UNSAFE")
@@ -145,7 +160,8 @@ def relationalInduction():
 	S.pop()
 
 def getLength(M, bad):
-	fp = z3.Fixedpoint()
+
+        fp = z3.Fixedpoint()
 	options = {'engine':'spacer'}
 	fp.set(**options)
 
@@ -167,10 +183,11 @@ def getLength(M, bad):
 	if r == z3.unsat:
 		return (z3.unsat, None)
 	else:
-		return (z3.sat, len(fp.get_answer().children()))
+                return (z3.sat, len(fp.get_answer().children()))
 
 def checkLength(M, bad, count):
-	fp = z3.Fixedpoint()
+
+        fp = z3.Fixedpoint()
 	options = {'engine': 'spacer'}
 	fp.set(**options)
 
@@ -196,10 +213,10 @@ def checkLength(M, bad, count):
 	if r == z3.unsat:
 		return (z3.unsat, None)
 	else:
-		return (z3.sat, len(inv.children()))
+                return (z3.sat, len(inv.children()))
 
-# I don't think we need a fixed point engine for doing checkLength
 def checkLengthBMC(M, bad, count):
+
         x = []
         for i in range(count):
                 x.append(M.addSuffix(str(i)))
@@ -209,7 +226,8 @@ def checkLengthBMC(M, bad, count):
 	trx = True
 
         for i in range(count-1):
-                temp = z3.And(*[xi == xpi for (xi, xpi) in itertools.izip(x[i], x[i+1])])
+                temp = M.transition(x[i])
+                temp = z3.And(*[xi == xpi for (xi, xpi) in itertools.izip(temp, x[i+1])])
                 trx = z3.And(trx, temp)
 
 	S = z3.Solver()
@@ -217,10 +235,47 @@ def checkLengthBMC(M, bad, count):
         S.add(trx)
         S.add(bad)
 	rBMC = (S.check())
-	return rBMC
+
+        if rBMC == z3.unsat:
+                # Compute the interpolant
+                formula1 = True
+                formula2 = True
+                xprime = []
+                for i in range(count):
+                        xprime.append(M.addSuffix(str(i)+"_prime"))
+                formula1 = z3.And(init, trx)
+                initprime = z3.simplify(z3.And(M.initialize(xprime[0])))
+                trxprime = True
+
+                for i in range(count-1):
+                        temp = M.transition(xprime[i])
+                        temp = z3.And(*[xi == xpi for (xi, xpi) in itertools.izip(temp, xprime[i+1])])
+                        trxprime = z3.And(trxprime, temp)
+
+                formula1 = z3.And(formula1, initprime, trxprime)
+
+                # xval are the exact values that consecutive states of M take
+                xval = [[0, 1]]                                                   
+                temp = True
+                
+                for i in range(count-1):
+                        xval.append(M.transition(x[i]))
+
+                for i in range(1, count):
+                        temp = z3.And(temp, *[xi == xvi for (xi, xvi) in itertools.izip(x[i], xval[i])])
+
+                formula1 = z3.And(formula1, temp)
+                
+                Msc = SelfComposedTransitionSystem(M)
+                formula2 = z3.simplify(z3.And(Msc.bad_sc(x[count-1]+xprime[count-1])))
+
+                return z3.unsat, x[count-1]+xprime[count-1], z3.mk_interpolant(formula1, formula2)
+                
+        return rBMC, None, None
         
 def getLength1(M, bad):
-	fp = z3.Fixedpoint()
+
+        fp = z3.Fixedpoint()
 	options = {'engine':'spacer'}
 	fp.set(**options)
 
@@ -243,17 +298,14 @@ def getLength1(M, bad):
 	inv_xs = inv(*xs)
 	inv_xsp = inv(*xsp)
 
-	print(inv_xs, inv_xsp)
-
 	fp.rule(inv_xs, M.init)
-	print(fp.get_rules())
 	fp.rule(inv_xsp, trx + [inv_xs])
 	fp.rule(err(), bad(xs) + [inv_xs])
 
 	r = fp.query(err) == z3.unsat
 	if r:
 		inv = fp.get_answer()
-		print("INV:")
+                print("INV:")
 		print(inv)
 		assert inv.is_forall()
 		body = inv.body()
@@ -267,9 +319,51 @@ def getLength1(M, bad):
 		print(z3.unsat, args, expr)
 		return (z3.unsat, args, expr)
 	else:
-		print("BAche chaide ne")
-		return (z3.sat, len(inv.children())-1, None)
+                return (z3.sat, len(fp.get_answer().children()), None)             # Are you sure this is the correct length?
 
+def checkLength1(M, bad, count):
+
+        fp = z3.Fixedpoint()
+	options = {'engine': 'spacer'}
+	fp.set(**options)
+
+	addCounter(M)
+
+	xs = M.variables
+	
+	sorts = M.sorts + [z3.BoolSort()]
+	inv = z3.Function('inv', *sorts)
+	err = z3.Bool('err')
+
+	fp.register_relation(inv)
+	fp.register_relation(err.decl())
+	fp.declare_var(*xs)
+
+	bad_state = [z3.And(bad(xs) + [xs[-1] == count])]
+
+	fp.rule(inv(*xs), M.init)
+	fp.rule(inv(*M.tr), inv(*xs))
+	fp.rule(err, bad_state + [inv(*xs)])
+
+	r = fp.query(err)
+	if r == z3.unsat:
+                inv = fp.get_answer()
+                print("INV:")
+		print(inv)
+		assert inv.is_forall()
+		body = inv.body()
+		assert z3.is_eq(body)
+		print("BODY:", body)
+		fapp = body.arg(0)
+		assert (z3.is_app(fapp))
+		args = [fapp.arg(i) for i in range(body.num_args())]
+		assert len(args) == len(xs)
+		expr = (body.arg(1))
+		print(z3.unsat, args, expr)
+		return (z3.unsat, args, expr)
+	else:
+		return (z3.sat, len(inv.children()), None)
+        
 if __name__ == '__main__':
 
 	relationalInduction()
