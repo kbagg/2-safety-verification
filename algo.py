@@ -37,12 +37,11 @@ class TransitionSystem(object):
 
 class SelfComposedTransitionSystem(object):
 
-	def __init__(self, model, suffix = ''):
+	def __init__(self, model):
 
-		self.suffix = suffix
-		self.model = model
-		v1 = model.addSuffix('1' + suffix)
-		v2 = model.addSuffix('2' + suffix)
+                self.model = model
+		v1 = model.addSuffix('1')
+		v2 = model.addSuffix('2')
 		self.variables = v1 + v2
 		self.sorts = model.sorts + model.sorts
 		self.init = model.initialize(v1) + model.initialize(v2)
