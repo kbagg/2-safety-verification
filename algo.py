@@ -116,6 +116,8 @@ def relationalInduction():
 		#r1, count1 = getLength(M, bad1)
                 #no1 = bad1(M.variables)
                 r1, arg1, expr1 = getLength1(M, bad1)
+                print "ARG1: ", arg1
+                print "xs[:n]: ", xs[:n]
                 
                 if r1 == z3.unsat:
 			#sub1 = zip(M.variables, xs[:n])
@@ -258,7 +260,7 @@ def checkLengthBMC(M, bad, count):
                 temp = True
                 
                 for i in range(count-1):
-                        xval.append(M.transition(x[i]))
+                        xval.append(M.transition(xval[i]))
 
                 for i in range(1, count):
                         temp = z3.And(temp, *[xi == xvi for (xi, xvi) in itertools.izip(x[i], xval[i])])
@@ -268,7 +270,7 @@ def checkLengthBMC(M, bad, count):
                 Msc = SelfComposedTransitionSystem(M)
                 formula2 = z3.simplify(z3.And(Msc.bad_sc(x[count-1]+xprime[count-1])))
 
-                return z3.unsat, x[count-1]+xprime[count-1], z3.mk_interpolant(formula1, formula2)
+                return z3.unsat, x[count-1]+xprime[count-1], formula1
                 
         return rBMC, None, None
         
