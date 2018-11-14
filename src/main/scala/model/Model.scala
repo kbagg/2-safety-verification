@@ -182,23 +182,25 @@ class CheckModel(){
 
   def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple3[Any, List[z3.ArithExpr], z3.BoolExpr] = {
 
+    z3.Global.setParameter("fixedpoint.engine", "pdr")
     val fp = ctx.mkFixedpoint();
+    println(fp.getParameterDescriptions().toString())
+    val params = ctx.mkParams();
+    params.add("fixedpoint.engine", "pdr");
+    fp.setParameters(params);
     var mp = new TransitionSystem("prime", ctx);
-    var xs = m.variables;
-    var xsp = mp.variables;
-    var xst = m.transition(xs);
-    val range = 0 until xs.size toList;
-    var trx = range.map(i=>ctx.mkEq(xsp(i), xst(i)));
     val sorts = m.sorts;
-    val inv = ctx.mkFuncDecl("inv", sorts, ctx.mkBoolSort());
-    val err = ctx.mkFuncDecl("err", Array[z3.Sort](), ctx.mkBoolSort());
+    val range = 0 until sorts.size toList;
+    var xs = range.map(i=>ctx.mkBound(i, sorts(i)).asInstanceOf[z3.ArithExpr]);
+    var xst = m.transition(xs);
+    val invDecl = ctx.mkFuncDecl("inv", sorts, ctx.mkBoolSort());
+    val errDecl = ctx.mkFuncDecl("error", Array[z3.Sort](), ctx.mkBoolSort());
     var symbols = new Array[z3.Symbol](xs.size)
     for(i<- 0 until xs.size){
       symbols(i) = ctx.mkSymbol(i).asInstanceOf[z3.Symbol];
     }
-
-    fp.registerRelation(inv);
-    fp.registerRelation(err);
+    fp.registerRelation(invDecl);
+    fp.registerRelation(errDecl);
     // for(x<-xs:::xsp){
     //   fp.declareVar(x);
     // }
@@ -213,25 +215,26 @@ class CheckModel(){
     }
 
     val initCond = ctx.mkAnd(m.initialize(xs):_*);
-    val invxs = inv.apply(xs:_*).asInstanceOf[z3.BoolExpr];
+    val invxs = invDecl.apply(xs:_*).asInstanceOf[z3.BoolExpr];
     var initRule = ctx.mkImplies(initCond, invxs);
     initRule = createForAll(sorts, symbols, initRule);
 
-    val trxInv = ctx.mkAnd(ctx.mkAnd(trx:_*), invxs);
-    val trxAfter = inv.apply(xsp:_*).asInstanceOf[z3.BoolExpr];
-    var trxRule = ctx.mkImplies(trxInv, trxAfter);
+    val trxAfter = invDecl.apply(xst:_*).asInstanceOf[z3.BoolExpr];
+    var trxRule = ctx.mkImplies(invxs, trxAfter);
     trxRule = createForAll(sorts, symbols, trxRule);
 
     val badxs = ctx.mkAnd(bad(xs):_*);
     val badInv = ctx.mkAnd(badxs, invxs);
-    var badRule = ctx.mkImplies(badInv, err.apply().asInstanceOf[z3.BoolExpr]);
+    var badRule = ctx.mkImplies(badInv, errDecl.apply().asInstanceOf[z3.BoolExpr]);
     badRule = createForAll(sorts, symbols, badRule);
 
     fp.addRule(initRule, ctx.mkSymbol("initRule"));
     fp.addRule(trxRule, ctx.mkSymbol("trxRule"));
     fp.addRule(badRule, ctx.mkSymbol("badRule"));
 
-    val rfp = fp.query(Array(err));
+    println(fp.toString());
+    val rfp = fp.query(Array(errDecl));
+    println(fp.getReasonUnknown())
     println(rfp);
 
     return (z3.Status.SATISFIABLE, m.variables, ctx.mkBool(true))
