@@ -1,3 +1,5 @@
+package model
+
 import com.microsoft.z3
 import java.util.HashMap
 import scala.collection.immutable._
@@ -293,13 +295,5 @@ class CheckModel(){
     }
 
     return (z3.Status.SATISFIABLE, m.variables, true.asInstanceOf[z3.BoolExpr])
-  }
-
-}
-
-object MainObject {
-  def main(args: Array[String]) {
-    var check = new CheckModel();
-    check.relationalInduction();
   }
 }
