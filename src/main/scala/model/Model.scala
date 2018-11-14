@@ -19,9 +19,9 @@ class TransitionSystem(suff:String=""){
   cfg.put("model", "true");
   val ctx = new z3.Context(cfg);
   var suffix = suff;
-  var variables = List(ctx.mkInt("x"), ctx.mkInt("y"));
+  var variables = List(ctx.mkIntConst("x"), ctx.mkIntConst("y"));
   if(suff !=""){
-    variables = List(ctx.mkInt("x_" + suffix), ctx.mkInt("y_" + suffix));
+    variables = List(ctx.mkIntConst("x_" + suffix), ctx.mkIntConst("y_" + suffix));
   }
   var sorts = List(ctx.mkIntSort, ctx.mkIntSort);
 
@@ -30,7 +30,7 @@ class TransitionSystem(suff:String=""){
     if(suff!=""){
       s = "_"+suff;
     }
-    return List(ctx.mkInt("x"+s), ctx.mkInt("y"+s));
+    return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("y"+s));
     //List(1, 2);
   }
 

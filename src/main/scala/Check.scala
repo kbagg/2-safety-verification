@@ -1,5 +1,3 @@
-package check
-
 import model.CheckModel
 
 object Check{
