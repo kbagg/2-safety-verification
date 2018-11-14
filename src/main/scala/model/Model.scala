@@ -121,8 +121,13 @@ class CheckModel(){
           var bad1 = (xs1:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs1(i), xm1(i))))):_*));
           var bad2 = (xs2:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs2(i), xm2(i))))):_*));
 
+          println("xm1", xm1)
+          println("xm2", xm2)
           // These 3 values are returned by the getLength function
           var (r1:Any, arg1:List[z3.ArithExpr], expr1:z3.BoolExpr) = getLength(m, bad1, ctx);
+          println("r1", r1)
+          println("arg1", arg1)
+          println("expr1", expr1)
 
           if(r1 == z3.Status.UNSATISFIABLE){
             // Can we work without the need to substitute?
@@ -141,23 +146,22 @@ class CheckModel(){
             break;
           }
 
-          var (r2:Any, arg2:List[z3.ArithExpr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, arg1, ctx);
+          var (r2:Any, arg2:List[z3.ArithExpr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
 
+          println("r2", r2)
+          println("arg2", arg2)
           expr2either match{
             case Left(expr2Inter) => {
               var expr2Array = expr2Inter.interp;
-              var xstemp = xs.slice(0, xs.size/2);
-              var p1 = expr2Array(0);
-              for (i <- 0 until xs.size/2){
-                p1 = p1.substitute(arg2(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
+              println("expr2", expr2Array(0))
+              println("xs", xs)
+              var p = expr2Array(0);
+              for (i <- 0 until xs.size){
+                p = p.substitute(arg2(i), xs(i)).asInstanceOf[z3.BoolExpr];
               }
-              xstemp = xs.slice(xs.size/2, xs.size);
-              var p2 = expr2Array(0);
-              for (i <- 0 until xs.size/2){
-                p2 = p2.substitute(arg2(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
-              }
-              solver.add(p1);
-              solver.add(p2);
+              println("p", p)
+              solver.add(p);
+              println("solver.check", solver.check())
               break;
             }
             case Right(None) => {
@@ -181,10 +185,8 @@ class CheckModel(){
   }
 
   def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple3[Any, List[z3.ArithExpr], z3.BoolExpr] = {
-
     z3.Global.setParameter("fixedpoint.engine", "pdr")
     val fp = ctx.mkFixedpoint();
-    println(fp.getParameterDescriptions().toString())
     val params = ctx.mkParams();
     params.add("fixedpoint.engine", "pdr");
     fp.setParameters(params);
@@ -231,23 +233,24 @@ class CheckModel(){
     fp.addRule(initRule, ctx.mkSymbol("initRule"));
     fp.addRule(trxRule, ctx.mkSymbol("trxRule"));
     fp.addRule(badRule, ctx.mkSymbol("badRule"));
-
-    println(fp.toString());
     val rfp = fp.query(Array(errDecl));
-    println(fp.getReasonUnknown())
-    println(rfp);
-
+    if(rfp == z3.Status.UNSATISFIABLE){
+      val ans = fp.getAnswer();
+      val varlist = ans.asInstanceOf[z3.Quantifier].getBoundVariableNames()
+      val body = ans.asInstanceOf[z3.Quantifier].getBody();
+      val args = body.getArgs();
+      var expr = args(1).simplify().asInstanceOf[z3.BoolExpr]
+      //xs.foreach(println)
+      return (z3.Status.UNSATISFIABLE, xs.reverse, expr)
+    }
     return (z3.Status.SATISFIABLE, m.variables, ctx.mkBool(true))
   }
 
-  def checkLength(m:TransitionSystem, msc:SelfComposedTransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], arg:List[z3.ArithExpr], ctx:z3.InterpolationContext):Tuple3[Any, List[z3.ArithExpr], Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]] = {
-
-    var count = arg.size;
+  def checkLength(m:TransitionSystem, msc:SelfComposedTransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], count:Int, ctx:z3.InterpolationContext):Tuple3[Any, List[z3.ArithExpr], Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]] = {
     var x = List(m.addsuffix("0"));
     for(i<-1 until count){
       x = x ::: List(m.addsuffix(i.toString()))
     }
-
     var badfinal = ctx.mkAnd(bad(x.reverse(0)):_*).simplify().asInstanceOf[z3.BoolExpr]
     var init = ctx.mkAnd(m.initialize(x(0)):_*).simplify().asInstanceOf[z3.BoolExpr]
     var trx = ctx.mkBool(true)
@@ -269,9 +272,9 @@ class CheckModel(){
     if(rbmc == z3.Status.UNSATISFIABLE){
       var formula1 = ctx.mkBool(true);
       var formula2 = ctx.mkBool(true);
-      var xprime = List(m.addsuffix("0"));
+      var xprime = List(m.addsuffix("0_prime"));
       for(i<-1 until count){
-        xprime = xprime ::: List(m.addsuffix(i.toString()))
+        xprime = xprime ::: List(m.addsuffix(i.toString()+"_prime"))
       }
       formula1 = ctx.mkAnd(init, trx).asInstanceOf[z3.BoolExpr];
       var initprime = ctx.mkAnd(m.initialize(xprime(0)):_*).simplify().asInstanceOf[z3.BoolExpr]
@@ -283,7 +286,7 @@ class CheckModel(){
         temp1 = ctx.mkAnd((range.map(j=>ctx.mkEq(temp(j), xprime(i+1)(j)))):_*).asInstanceOf[z3.BoolExpr];
         trxprime = ctx.mkAnd(temp1, trxprime).asInstanceOf[z3.BoolExpr];
       }
-      formula1 = ctx.mkAnd(initprime, trxprime).asInstanceOf[z3.BoolExpr]
+      formula1 = ctx.mkAnd(initprime, trxprime, formula1).asInstanceOf[z3.BoolExpr]
       // xval are the exact values that consecutive states of M take
       var xval = List(List(ctx.mkInt(0), ctx.mkInt(1)));
       for(i<-0 until count-1){
@@ -292,11 +295,15 @@ class CheckModel(){
       for(i<-1 until count){
         formula1 = ctx.mkAnd(formula1, ctx.mkAnd((range.map(j=>ctx.mkEq(x(i)(j), xval(i)(j)))):_*).asInstanceOf[z3.BoolExpr]).asInstanceOf[z3.BoolExpr]
       }
+      println("formula1", formula1)
       val i1 = ctx.MkInterpolant(formula1);
+      println(i1)
       formula2 = ctx.mkAnd(msc.bad_sc(x(count-1):::xprime(count-1)):_*).simplify().asInstanceOf[z3.BoolExpr];
-      return (z3.Status.UNSATISFIABLE, x(count-1):::xprime(count-1), Left(ctx.ComputeInterpolant(ctx.mkAnd(i1, formula2), ctx.mkParams())))
+      println("formula2", formula2)
+      val result = ctx.ComputeInterpolant(ctx.mkAnd(i1, formula2), ctx.mkParams())
+      println("interpolant", result.interp(0))
+      return (z3.Status.UNSATISFIABLE, x(count-1):::xprime(count-1), Left(result))
     }
-
     return (z3.Status.SATISFIABLE, m.variables, Right(None))
   }
 }

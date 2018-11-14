@@ -19,7 +19,7 @@ class TransitionSystem(object):
 		self.tr = [xs[0] + 1, xs[0] + xs[1]]
 		self.bad = [xs[0] > xs[1]]
 
-	def addSuffix(self, suffix = ''):
+	def addSuffix(self, suffix = 
 	    if suffix != '':
 	    	s = '_' + suffix
 	    else:
