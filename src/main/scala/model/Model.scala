@@ -13,17 +13,14 @@ import com.microsoft.z3.enumerations.Z3_decl_kind
 import java.io.File
 import java.io.PrintWriter
 
-class TransitionSystem(suff:String=""){
+class TransitionSystem(suff:String, ctx:z3.Context){
 
-  val cfg = new HashMap[String, String]();
-  cfg.put("model", "true");
-  val ctx = new z3.Context(cfg);
   var suffix = suff;
   var variables = List(ctx.mkIntConst("x"), ctx.mkIntConst("y"));
   if(suff !=""){
     variables = List(ctx.mkIntConst("x_" + suffix), ctx.mkIntConst("y_" + suffix));
   }
-  var sorts = List(ctx.mkIntSort, ctx.mkIntSort);
+  var sorts = Array[z3.Sort](ctx.mkIntSort(), ctx.mkIntSort());
 
   def addsuffix(suff:String=""):List[z3.ArithExpr] = {
     var s = "";
@@ -43,14 +40,13 @@ class TransitionSystem(suff:String=""){
   }
 }
 
-class SelfComposedTransitionSystem(modelarg:TransitionSystem){
+class SelfComposedTransitionSystem(modelarg:TransitionSystem, ctx:z3.Context){
 
-  val ctx = modelarg.ctx;
   var model = modelarg;
   var vm = modelarg.addsuffix("1");
   var vmprime = modelarg.addsuffix("2");
   var variables = vm ::: vmprime;
-  var sorts = modelarg.sorts ::: modelarg.sorts
+  var sorts = modelarg.sorts ++ modelarg.sorts;
   var arity = 4;
 
   def addsuffix(suff:String=""):List[z3.ArithExpr] = {
@@ -77,13 +73,13 @@ class CheckModel(){
 
   def relationalInduction(){
 
-    var m = new TransitionSystem();
-    var msc = new SelfComposedTransitionSystem(m);
     val cfg = new HashMap[String, String]();
     cfg.put("model", "true");
     cfg.put("proof", "true");
-    val ctx = z3.InterpolationContext.mkContext(cfg);
-    
+    val ctx = z3.InterpolationContext.mkContext(cfg); 
+    var m = new TransitionSystem("", ctx);
+    var msc = new SelfComposedTransitionSystem(m, ctx);
+
     var xs = msc.variables;
     var xst = msc.transition(xs);
     var xsp = msc.addsuffix("prime");
@@ -103,7 +99,7 @@ class CheckModel(){
     solver.push();
 
     var bad_proofob = ctx.mkAnd(msc.bad_sc(xsp):_*).simplify().asInstanceOf[z3.BoolExpr];
-    var trx = true.asInstanceOf[z3.BoolExpr];
+    var trx = ctx.mkBool(true);
     for (i <- 0 until msc.arity){
       trx = ctx.mkAnd(trx, ctx.mkEq(xsp(i), xst(i))).simplify().asInstanceOf[z3.BoolExpr];
     }
@@ -113,6 +109,7 @@ class CheckModel(){
     solver.add(bad_proofob);
 
     var n = xs.size/2;
+    var unsafe = false;
 
     breakable{
       while(solver.check() == z3.Status.SATISFIABLE){
@@ -120,13 +117,13 @@ class CheckModel(){
           var model = solver.getModel();
           var xm1 = xs.slice(0, xs.size/2).map(xsi => model.eval(xsi, true))
           var xm2 = xs.slice(xs.size/2, xs.size).map(xsi => model.eval(xsi, true))
-          val range = 0 until xs.size toList;
+          val range = 0 until xm1.size toList;
           var bad1 = (xs1:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs1(i), xm1(i))))):_*));
           var bad2 = (xs2:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs2(i), xm2(i))))):_*));
 
           // These 3 values are returned by the getLength function
-          var (r1:Any, arg1:List[z3.ArithExpr], expr1:z3.BoolExpr) = getLength(m, bad1);
-      
+          var (r1:Any, arg1:List[z3.ArithExpr], expr1:z3.BoolExpr) = getLength(m, bad1, ctx);
+
           if(r1 == z3.Status.UNSATISFIABLE){
             // Can we work without the need to substitute?
             var xstemp = xs.slice(0, xs.size/2);
@@ -144,55 +141,61 @@ class CheckModel(){
             break;
           }
 
-          var (r2:Any, arg2:List[z3.ArithExpr], expr2:z3.BoolExpr) = checkLength(m, msc, bad2, arg1);
+          var (r2:Any, arg2:List[z3.ArithExpr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, arg1, ctx);
 
-          if(r2 == z3.Status.UNSATISFIABLE){
-            // Can we work without the need to substitute?
-            var xstemp = xs.slice(0, xs.size/2);
-            var p1 = expr2;
-            for (i <- 0 until xs.size/2){
-              p1 = p1.substitute(arg2(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
+          expr2either match{
+            case Left(expr2Inter) => {
+              var expr2Array = expr2Inter.interp;
+              var xstemp = xs.slice(0, xs.size/2);
+              var p1 = expr2Array(0);
+              for (i <- 0 until xs.size/2){
+                p1 = p1.substitute(arg2(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
+              }
+              xstemp = xs.slice(xs.size/2, xs.size);
+              var p2 = expr2Array(0);
+              for (i <- 0 until xs.size/2){
+                p2 = p2.substitute(arg2(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
+              }
+              solver.add(p1);
+              solver.add(p2);
+              break;
             }
-            xstemp = xs.slice(xs.size/2, xs.size);
-            var p2 = expr2;
-            for (i <- 0 until xs.size/2){
-              p2 = p2.substitute(arg2(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
+            case Right(None) => {
+              unsafe = true;
+              break;
             }
-            solver.add(p1);
-            solver.add(p2);
-            break;
           }
         }
-        println("UNSAFE");
-        break;
+        if(unsafe == true){
+          break;
+        }
       }
+    }
+
+    if(unsafe == true){
+      println("UNSAFE");
+    }
+    else{
       println("SAFE");
-      break;
     }
   }
 
-  def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr]):Tuple3[Any, List[z3.ArithExpr], z3.BoolExpr] = {
+  def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple3[Any, List[z3.ArithExpr], z3.BoolExpr] = {
 
-    z3.Global.setParameter("fixedpoint.engine", "pdr");
-    val cfg = new HashMap[String, String]();
-    cfg.put("model", "true");
-    val ctx = new z3.Context(cfg);
     val fp = ctx.mkFixedpoint();
-
-    var mp = new TransitionSystem("prime");
+    var mp = new TransitionSystem("prime", ctx);
     var xs = m.variables;
     var xsp = mp.variables;
     var xst = m.transition(xs);
     val range = 0 until xs.size toList;
     var trx = range.map(i=>ctx.mkEq(xsp(i), xst(i)));
-    val sorts = m.sorts.asInstanceOf[Array[z3.Sort]];
+    val sorts = m.sorts;
     val inv = ctx.mkFuncDecl("inv", sorts, ctx.mkBoolSort());
     val err = ctx.mkFuncDecl("err", Array[z3.Sort](), ctx.mkBoolSort());
     var symbols = new Array[z3.Symbol](xs.size)
     for(i<- 0 until xs.size){
       symbols(i) = ctx.mkSymbol(i).asInstanceOf[z3.Symbol];
     }
-    symbols = symbols
 
     fp.registerRelation(inv);
     fp.registerRelation(err);
@@ -231,15 +234,11 @@ class CheckModel(){
     val rfp = fp.query(Array(err));
     println(rfp);
 
-    return (z3.Status.SATISFIABLE, m.variables, true.asInstanceOf[z3.BoolExpr])
+    return (z3.Status.SATISFIABLE, m.variables, ctx.mkBool(true))
   }
 
-  def checkLength(m:TransitionSystem, msc:SelfComposedTransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], arg:List[z3.ArithExpr]):Tuple3[Any, List[z3.ArithExpr], z3.BoolExpr] = {
+  def checkLength(m:TransitionSystem, msc:SelfComposedTransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], arg:List[z3.ArithExpr], ctx:z3.InterpolationContext):Tuple3[Any, List[z3.ArithExpr], Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]] = {
 
-    val cfg = new HashMap[String, String]();
-    cfg.put("model", "true");
-    cfg.put("proof", "true");
-    val ctx = z3.InterpolationContext.mkContext(cfg);
     var count = arg.size;
     var x = List(m.addsuffix("0"));
     for(i<-1 until count){
@@ -248,10 +247,10 @@ class CheckModel(){
 
     var badfinal = ctx.mkAnd(bad(x.reverse(0)):_*).simplify().asInstanceOf[z3.BoolExpr]
     var init = ctx.mkAnd(m.initialize(x(0)):_*).simplify().asInstanceOf[z3.BoolExpr]
-    var trx = true.asInstanceOf[z3.BoolExpr]
+    var trx = ctx.mkBool(true)
     val range = 0 until x(0).size toList;
     var temp = m.transition(x(0));
-    var temp1 = true.asInstanceOf[z3.BoolExpr]
+    var temp1 = ctx.mkBool(true)
     for(i<-0 until count-1){
       temp = m.transition(x(i));
       temp1 = ctx.mkAnd((range.map(j=>ctx.mkEq(temp(j), x(i+1)(j)))):_*).asInstanceOf[z3.BoolExpr];
@@ -265,17 +264,17 @@ class CheckModel(){
     var rbmc = s.check();
 
     if(rbmc == z3.Status.UNSATISFIABLE){
-      var formula1 = true.asInstanceOf[z3.BoolExpr];
-      var formula2 = true.asInstanceOf[z3.BoolExpr];
+      var formula1 = ctx.mkBool(true);
+      var formula2 = ctx.mkBool(true);
       var xprime = List(m.addsuffix("0"));
       for(i<-1 until count){
         xprime = xprime ::: List(m.addsuffix(i.toString()))
       }
       formula1 = ctx.mkAnd(init, trx).asInstanceOf[z3.BoolExpr];
       var initprime = ctx.mkAnd(m.initialize(xprime(0)):_*).simplify().asInstanceOf[z3.BoolExpr]
-      var trxprime = true.asInstanceOf[z3.BoolExpr]
+      var trxprime = ctx.mkBool(true)
       temp = m.transition(xprime(0));
-      temp1 = true.asInstanceOf[z3.BoolExpr]
+      temp1 = ctx.mkBool(true)
       for(i<-0 until count-1){
         temp = m.transition(xprime(i));
         temp1 = ctx.mkAnd((range.map(j=>ctx.mkEq(temp(j), xprime(i+1)(j)))):_*).asInstanceOf[z3.BoolExpr];
@@ -290,10 +289,11 @@ class CheckModel(){
       for(i<-1 until count){
         formula1 = ctx.mkAnd(formula1, ctx.mkAnd((range.map(j=>ctx.mkEq(x(i)(j), xval(i)(j)))):_*).asInstanceOf[z3.BoolExpr]).asInstanceOf[z3.BoolExpr]
       }
+      val i1 = ctx.MkInterpolant(formula1);
       formula2 = ctx.mkAnd(msc.bad_sc(x(count-1):::xprime(count-1)):_*).simplify().asInstanceOf[z3.BoolExpr];
-      return (z3.Status.UNSATISFIABLE, x(count-1):::xprime(count-1), ctx.ComputeInterpolant(ctx.mkAnd(formula1, formula2), ctx.mkParams()).interp(0).asInstanceOf[z3.BoolExpr])
+      return (z3.Status.UNSATISFIABLE, x(count-1):::xprime(count-1), Left(ctx.ComputeInterpolant(ctx.mkAnd(i1, formula2), ctx.mkParams())))
     }
 
-    return (z3.Status.SATISFIABLE, m.variables, true.asInstanceOf[z3.BoolExpr])
+    return (z3.Status.SATISFIABLE, m.variables, Right(None))
   }
 }

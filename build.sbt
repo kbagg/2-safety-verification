@@ -6,4 +6,4 @@ scalacOptions += "-feature"
 scalacOptions += "-unchecked"
 scalacOptions += "-deprecation"
 
-
+cancelable in Global := true
