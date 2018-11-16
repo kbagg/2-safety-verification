@@ -188,7 +188,7 @@ class CheckModel(){
     z3.Global.setParameter("fixedpoint.engine", "pdr")
     val fp = ctx.mkFixedpoint();
     val params = ctx.mkParams();
-    params.add("fixedpoint.engine", "pdr");
+    params.add("fixedpoint.engine", "spcaer");
     fp.setParameters(params);
     var mp = new TransitionSystem("prime", ctx);
     val sorts = m.sorts;
@@ -243,6 +243,10 @@ class CheckModel(){
       //xs.foreach(println)
       return (z3.Status.UNSATISFIABLE, xs.reverse, expr)
     }
+
+    // This is the trace length
+    var length = fp.getAnswer().getArgs().size
+
     return (z3.Status.SATISFIABLE, m.variables, ctx.mkBool(true))
   }
 
