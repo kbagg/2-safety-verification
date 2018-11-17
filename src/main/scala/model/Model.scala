@@ -13,6 +13,36 @@ import com.microsoft.z3.enumerations.Z3_decl_kind
 import java.io.File
 import java.io.PrintWriter
 
+// Transition system: x' -> x + 1, y' -> x + y
+// class TransitionSystem(suff:String, ctx:z3.Context){
+
+//   var suffix = suff;
+//   var variables = List(ctx.mkIntConst("x"), ctx.mkIntConst("y"));
+//   if(suff !=""){
+//     variables = List(ctx.mkIntConst("x_" + suffix), ctx.mkIntConst("y_" + suffix));
+//   }
+//   var sorts = Array[z3.Sort](ctx.mkIntSort(), ctx.mkIntSort());
+
+//   def addsuffix(suff:String=""):List[z3.ArithExpr] = {
+//     var s = "";
+//     if(suff!=""){
+//       s = "_"+suff;
+//     }
+//     return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("y"+s));
+//     //List(1, 2);
+//   }
+
+//   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
+//     return List(ctx.mkEq(xs(0), ctx.mkInt(0)), ctx.mkEq(xs(1), ctx.mkInt(1)));
+//   }
+
+//   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
+//     return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)));
+//   }
+// }
+
+
+// Transition system: x' -> y, y' -> x + y, fibonacci
 class TransitionSystem(suff:String, ctx:z3.Context){
 
   var suffix = suff;
@@ -32,11 +62,11 @@ class TransitionSystem(suff:String, ctx:z3.Context){
   }
 
   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
-    return List(ctx.mkEq(xs(0), ctx.mkInt(0)), ctx.mkEq(xs(1), ctx.mkInt(1)));
+    return List(ctx.mkEq(xs(0), ctx.mkInt(1)), ctx.mkEq(xs(1), ctx.mkInt(1)));
   }
 
   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
-    return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)));
+    return List(xs(1), ctx.mkAdd(xs(0), xs(1)));
   }
 }
 
