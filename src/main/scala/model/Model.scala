@@ -62,11 +62,14 @@ class TransitionSystem(suff:String, ctx:z3.Context){
   }
 
   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
+    //return List(ctx.mkEq(xs(0), ctx.mkInt(0)), ctx.mkEq(xs(1), ctx.mkInt(1)));
     return List(ctx.mkEq(xs(0), ctx.mkInt(1)), ctx.mkEq(xs(1), ctx.mkInt(1)));
   }
 
   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
-    return List(xs(1), ctx.mkAdd(xs(0), xs(1)));
+    //return List(xs(1), ctx.mkAdd(xs(0), xs(1)));
+    //return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)))
+    return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkMul(ctx.mkAdd(xs(0), ctx.mkInt(1)), xs(1)))
   }
 }
 
@@ -94,7 +97,8 @@ class SelfComposedTransitionSystem(modelarg:TransitionSystem, ctx:z3.Context){
   }
 
   def bad_sc(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
-    return List(ctx.mkAnd(ctx.mkEq(xs(0), xs(2)), ctx.mkDistinct(xs(1), xs(3))))
+    //return List(ctx.mkAnd(ctx.mkEq(xs(0), xs(2)), ctx.mkDistinct(xs(1), xs(3))))
+    return List(ctx.mkAnd(ctx.mkLt(xs(0), xs(2)), ctx.mkGe(xs(1), xs(3))))
   }
 
 }
@@ -264,7 +268,9 @@ class CheckModel(){
     fp.addRule(initRule, ctx.mkSymbol("initRule"));
     fp.addRule(trxRule, ctx.mkSymbol("trxRule"));
     fp.addRule(badRule, ctx.mkSymbol("badRule"));
+    println("fp", fp.toString)
     val rfp = fp.query(Array(errDecl));
+    println("rfp", rfp)
     if(rfp == z3.Status.UNSATISFIABLE){
       val ans = fp.getAnswer();
       val body = ans.asInstanceOf[z3.Quantifier].getBody();
