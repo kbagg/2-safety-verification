@@ -124,7 +124,8 @@ class CheckModel(){
           println("xm1", xm1)
           println("xm2", xm2)
           // These 3 values are returned by the getLength function
-          var (r1:Any, arg1:List[z3.Expr], expr1:z3.BoolExpr) = getLength(m, bad1, ctx);
+          var (r1:Any, arg1:List[z3.Expr], expr1:z3.BoolExpr, length:Int) = getLength(m, bad1, ctx);
+          println("length", length)
           println("r1", r1)
           println("arg1", arg1)
           println("expr1", expr1)
@@ -145,8 +146,8 @@ class CheckModel(){
             solver.add(p2);
             break;
           }
-
-          var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
+          // var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
+          var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, length, ctx);
 
           println("r2", r2)
           println("arg2", arg2)
@@ -184,7 +185,7 @@ class CheckModel(){
     }
   }
 
-  def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple3[Any, List[z3.Expr], z3.BoolExpr] = {
+  def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple4[Any, List[z3.Expr], z3.BoolExpr, Int] = {
     z3.Global.setParameter("fixedpoint.engine", "pdr")
     val fp = ctx.mkFixedpoint();
     val params = ctx.mkParams();
@@ -240,14 +241,14 @@ class CheckModel(){
       val args = body.getArgs();
       var varlist = args(0).getArgs().toList
       var expr = args(1).simplify().asInstanceOf[z3.BoolExpr]
-      
-      return (z3.Status.UNSATISFIABLE, varlist, expr)
+
+      return (z3.Status.UNSATISFIABLE, varlist, expr, -1)
     }
 
-    // This is the trace length
-    var length = fp.getAnswer().getArgs().size
+    // This is the trace length. Why is a +1 needed?
+    var length = fp.getAnswer().getArgs().size + 1
 
-    return (z3.Status.SATISFIABLE, m.variables, ctx.mkBool(true))
+    return (z3.Status.SATISFIABLE, m.variables, ctx.mkBool(true), length)
   }
 
   def checkLength(m:TransitionSystem, msc:SelfComposedTransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], count:Int, ctx:z3.InterpolationContext):Tuple3[Any, List[z3.ArithExpr], Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]] = {
