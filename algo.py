@@ -19,7 +19,7 @@ class TransitionSystem(object):
 		self.tr = [xs[0] + 1, xs[0] + xs[1]]
 		self.bad = [xs[0] > xs[1]]
 
-	def addSuffix(self, suffix = 
+	def addSuffix(self, suffix = ''):
 	    if suffix != '':
 	    	s = '_' + suffix
 	    else:
@@ -310,9 +310,10 @@ def getLength1(M, bad):
 		print(inv)
 		assert inv.is_forall()
 		body = inv.body()
-		assert z3.is_eq(body)
+		# assert z3.is_eq(body)
 		print("BODY:", body)
 		fapp = body.arg(0)
+		print("FAPP: ", fapp)
 		assert (z3.is_app(fapp))
 		args = [fapp.arg(i) for i in range(body.num_args())]
 		assert len(args) == len(xs)

@@ -1,0 +1,21 @@
+set fork in run := true
+run
+set fork in run := true
+run
+set fork in run := true
+run
+set fork in run := true
+run
+set fork in run := true
+run
+run | grep ans
+set fork in run := true
+run
+set fork in run := true
+run
+set fork in run := true
+run
+set fork in run := true
+run
+set fork in run := true
+run

@@ -1,0 +1,6 @@
+[0m[[0m[31merror[0m] [0m[0m/home/jaismin/Documents/sem7/cs698/project/Self-Composition-using-z3/src/main/scala/model/Model.scala:243:40: type mismatch;[0m
+[0m[[0m[31merror[0m] [0m[0m found   : Array[com.microsoft.z3.Expr][0m
+[0m[[0m[31merror[0m] [0m[0m required: List[com.microsoft.z3.Expr][0m
+[0m[[0m[31merror[0m] [0m[0m      return (z3.Status.UNSATISFIABLE, varlist, expr)[0m
+[0m[[0m[31merror[0m] [0m[0m                                       ^[0m
+[0m[[0m[31merror[0m] [0m[0mone error found[0m

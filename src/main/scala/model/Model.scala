@@ -124,7 +124,7 @@ class CheckModel(){
           println("xm1", xm1)
           println("xm2", xm2)
           // These 3 values are returned by the getLength function
-          var (r1:Any, arg1:List[z3.ArithExpr], expr1:z3.BoolExpr) = getLength(m, bad1, ctx);
+          var (r1:Any, arg1:List[z3.Expr], expr1:z3.BoolExpr) = getLength(m, bad1, ctx);
           println("r1", r1)
           println("arg1", arg1)
           println("expr1", expr1)
@@ -146,7 +146,7 @@ class CheckModel(){
             break;
           }
 
-          var (r2:Any, arg2:List[z3.ArithExpr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
+          var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
 
           println("r2", r2)
           println("arg2", arg2)
@@ -184,7 +184,7 @@ class CheckModel(){
     }
   }
 
-  def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple3[Any, List[z3.ArithExpr], z3.BoolExpr] = {
+  def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple3[Any, List[z3.Expr], z3.BoolExpr] = {
     z3.Global.setParameter("fixedpoint.engine", "pdr")
     val fp = ctx.mkFixedpoint();
     val params = ctx.mkParams();
@@ -236,12 +236,12 @@ class CheckModel(){
     val rfp = fp.query(Array(errDecl));
     if(rfp == z3.Status.UNSATISFIABLE){
       val ans = fp.getAnswer();
-      val varlist = ans.asInstanceOf[z3.Quantifier].getBoundVariableNames()
       val body = ans.asInstanceOf[z3.Quantifier].getBody();
       val args = body.getArgs();
+      var varlist = args(0).getArgs().toList
       var expr = args(1).simplify().asInstanceOf[z3.BoolExpr]
-      //xs.foreach(println)
-      return (z3.Status.UNSATISFIABLE, xs.reverse, expr)
+      
+      return (z3.Status.UNSATISFIABLE, varlist, expr)
     }
 
     // This is the trace length
