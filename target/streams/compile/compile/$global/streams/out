@@ -1,7 +1,0 @@
-[0m[[0m[31merror[0m] [0m[0m/home/jaismin/Documents/sem7/cs698/project/Self-Composition-using-z3/src/main/scala/model/Model.scala:187:135: '=' expected but ',' found.[0m
-[0m[[0m[31merror[0m] [0m[0m  def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple3[Any, List[z3.Expr], z3.BoolExpr], Int = {[0m
-[0m[[0m[31merror[0m] [0m[0m                                                                                                                                      ^[0m
-[0m[[0m[31merror[0m] [0m[0m/home/jaismin/Documents/sem7/cs698/project/Self-Composition-using-z3/src/main/scala/model/Model.scala:253:1: illegal start of simple expression[0m
-[0m[[0m[31merror[0m] [0m[0m  def checkLength(m:TransitionSystem, msc:SelfComposedTransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], count:Int, ctx:z3.InterpolationContext):Tuple3[Any, List[z3.ArithExpr], Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]] = {[0m
-[0m[[0m[31merror[0m] [0m[0m^[0m
-[0m[[0m[31merror[0m] [0m[0mtwo errors found[0m

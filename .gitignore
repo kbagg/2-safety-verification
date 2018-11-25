@@ -1,4 +1,5 @@
 *.class
-.gitignore~
 project
 target
+*.smt2
+*~
