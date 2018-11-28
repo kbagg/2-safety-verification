@@ -43,35 +43,96 @@ import java.io.PrintWriter
 
 
 // Transition system: x' -> y, y' -> x + y, fibonacci
+// class TransitionSystem(suff:String, ctx:z3.Context){
+
+//   var suffix = suff;
+//   var variables = List(ctx.mkIntConst("x"), ctx.mkIntConst("y"));
+//   if(suff !=""){
+//     variables = List(ctx.mkIntConst("x_" + suffix), ctx.mkIntConst("y_" + suffix));
+//   }
+//   var sorts = Array[z3.Sort](ctx.mkIntSort(), ctx.mkIntSort());
+
+//   def addsuffix(suff:String=""):List[z3.ArithExpr] = {
+//     var s = "";
+//     if(suff!=""){
+//       s = "_"+suff;
+//     }
+//     return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("y"+s));
+//     //List(1, 2);
+//   }
+
+//   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
+//     //return List(ctx.mkEq(xs(0), ctx.mkInt(0)), ctx.mkEq(xs(1), ctx.mkInt(1)));
+//     return List(ctx.mkEq(xs(0), ctx.mkInt(1)), ctx.mkEq(xs(1), ctx.mkInt(1)));
+//   }
+
+//   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
+//     //return List(xs(1), ctx.mkAdd(xs(0), xs(1)));
+//     //return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)))
+//     return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkMul(ctx.mkAdd(xs(0), ctx.mkInt(1)), xs(1)))
+//   }
+// }
+
+// Transition system: x -> x, h -> h, l -> ITE(h != 0, 1, x)
 class TransitionSystem(suff:String, ctx:z3.Context){
 
   var suffix = suff;
-  var variables = List(ctx.mkIntConst("x"), ctx.mkIntConst("y"));
+  var variables = List(ctx.mkIntConst("x"), ctx.mkIntConst("h"), ctx.mkIntConst("l"));
   if(suff !=""){
-    variables = List(ctx.mkIntConst("x_" + suffix), ctx.mkIntConst("y_" + suffix));
+    variables = List(ctx.mkIntConst("x_" + suffix), ctx.mkIntConst("h_" + suffix), ctx.mkIntConst("l_" + suffix));
   }
-  var sorts = Array[z3.Sort](ctx.mkIntSort(), ctx.mkIntSort());
+  var sorts = Array[z3.Sort](ctx.mkIntSort(), ctx.mkIntSort(), ctx.mkIntSort());
 
   def addsuffix(suff:String=""):List[z3.ArithExpr] = {
     var s = "";
     if(suff!=""){
       s = "_"+suff;
     }
-    return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("y"+s));
+    return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("h"+s), ctx.mkIntConst("l"+s));
     //List(1, 2);
   }
 
   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
     //return List(ctx.mkEq(xs(0), ctx.mkInt(0)), ctx.mkEq(xs(1), ctx.mkInt(1)));
-    return List(ctx.mkEq(xs(0), ctx.mkInt(1)), ctx.mkEq(xs(1), ctx.mkInt(1)));
+    return List(ctx.mkBool(true));
   }
 
   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
     //return List(xs(1), ctx.mkAdd(xs(0), xs(1)));
     //return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)))
-    return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkMul(ctx.mkAdd(xs(0), ctx.mkInt(1)), xs(1)))
+    return List(xs(0), xs(1), ctx.mkITE(ctx.mkDistinct(xs(1), ctx.mkInt(0)),ctx.mkInt(1),xs(0)).asInstanceOf[z3.ArithExpr]);
   }
 }
+
+// class SelfComposedTransitionSystem(modelarg:TransitionSystem, ctx:z3.Context){
+
+//   var model = modelarg;
+//   var vm = modelarg.addsuffix("1");
+//   var vmprime = modelarg.addsuffix("2");
+//   var variables = vm ::: vmprime;
+//   var sorts = modelarg.sorts ++ modelarg.sorts;
+//   var arity = 4;
+
+//   def addsuffix(suff:String=""):List[z3.ArithExpr] = {
+//     var v1 = this.model.addsuffix("1"+suff);
+//     var v2 = this.model.addsuffix("2"+suff);
+//     return v1 ::: v2;
+//   }
+
+//   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
+//     return this.model.initialize(xs.slice(0, xs.size/2)) ::: this.model.initialize(xs.slice(xs.size/2, xs.size))
+//   }
+
+//   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
+//     return this.model.transition(xs.slice(0, xs.size/2)) ::: this.model.transition(xs.slice(xs.size/2, xs.size))
+//   }
+
+//   def bad_sc(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
+//     //return List(ctx.mkAnd(ctx.mkEq(xs(0), xs(2)), ctx.mkDistinct(xs(1), xs(3))))
+//     return List(ctx.mkAnd(ctx.mkLt(xs(0), xs(2)), ctx.mkGe(xs(1), xs(3))))
+//   }
+
+// }
 
 class SelfComposedTransitionSystem(modelarg:TransitionSystem, ctx:z3.Context){
 
@@ -89,7 +150,7 @@ class SelfComposedTransitionSystem(modelarg:TransitionSystem, ctx:z3.Context){
   }
 
   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
-    return this.model.initialize(xs.slice(0, xs.size/2)) ::: this.model.initialize(xs.slice(xs.size/2, xs.size))
+    return List(ctx.mkEq(xs(2), xs(5)), ctx.mkDistinct(xs(1), xs(4)), ctx.mkEq(xs(0), xs(3)));
   }
 
   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
@@ -98,7 +159,7 @@ class SelfComposedTransitionSystem(modelarg:TransitionSystem, ctx:z3.Context){
 
   def bad_sc(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
     //return List(ctx.mkAnd(ctx.mkEq(xs(0), xs(2)), ctx.mkDistinct(xs(1), xs(3))))
-    return List(ctx.mkAnd(ctx.mkLt(xs(0), xs(2)), ctx.mkGe(xs(1), xs(3))))
+    return List(ctx.mkDistinct(xs(2), xs(5)), ctx.mkEq(xs(0), xs(3)))
   }
 
 }
@@ -158,7 +219,9 @@ class CheckModel(){
           println("xm1", xm1)
           println("xm2", xm2)
           // These 3 values are returned by the getLength function
+          println("Entering get Length");
           var (r1:Any, arg1:List[z3.Expr], expr1:z3.BoolExpr, length:Int) = getLength(m, bad1, ctx);
+          println("Exited get Length");
           println("length", length)
           println("r1", r1)
           println("arg1", arg1)
@@ -181,8 +244,10 @@ class CheckModel(){
             break;
           }
           // var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
+          println("Entering check Length");
           var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, length, ctx);
 
+          println("Exited check Length");
           println("r2", r2)
           println("arg2", arg2)
           expr2either match{
@@ -309,7 +374,7 @@ class CheckModel(){
     s.add(trx);
     s.add(badfinal);
     var rbmc = s.check();
-
+    println("RBMC", rbmc);
     if(rbmc == z3.Status.UNSATISFIABLE){
       var formula1 = ctx.mkBool(true);
       var formula2 = ctx.mkBool(true);
