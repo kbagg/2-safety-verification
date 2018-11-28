@@ -29,7 +29,6 @@ import java.io.PrintWriter
 //       s = "_"+suff;
 //     }
 //     return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("y"+s));
-//     //List(1, 2);
 //   }
 
 //   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
@@ -38,38 +37,6 @@ import java.io.PrintWriter
 
 //   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
 //     return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)));
-//   }
-// }
-
-
-// Transition system: x' -> y, y' -> x + y, fibonacci
-// class TransitionSystem(suff:String, ctx:z3.Context){
-
-//   var suffix = suff;
-//   var variables = List(ctx.mkIntConst("x"), ctx.mkIntConst("y"));
-//   if(suff !=""){
-//     variables = List(ctx.mkIntConst("x_" + suffix), ctx.mkIntConst("y_" + suffix));
-//   }
-//   var sorts = Array[z3.Sort](ctx.mkIntSort(), ctx.mkIntSort());
-
-//   def addsuffix(suff:String=""):List[z3.ArithExpr] = {
-//     var s = "";
-//     if(suff!=""){
-//       s = "_"+suff;
-//     }
-//     return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("y"+s));
-//     //List(1, 2);
-//   }
-
-//   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
-//     //return List(ctx.mkEq(xs(0), ctx.mkInt(0)), ctx.mkEq(xs(1), ctx.mkInt(1)));
-//     return List(ctx.mkEq(xs(0), ctx.mkInt(1)), ctx.mkEq(xs(1), ctx.mkInt(1)));
-//   }
-
-//   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
-//     //return List(xs(1), ctx.mkAdd(xs(0), xs(1)));
-//     //return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)))
-//     return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkMul(ctx.mkAdd(xs(0), ctx.mkInt(1)), xs(1)))
 //   }
 // }
 
@@ -89,17 +56,13 @@ class TransitionSystem(suff:String, ctx:z3.Context){
       s = "_"+suff;
     }
     return List(ctx.mkIntConst("x"+s), ctx.mkIntConst("h"+s), ctx.mkIntConst("l"+s));
-    //List(1, 2);
   }
 
   def initialize(xs:List[z3.ArithExpr]):List[z3.BoolExpr] = {
-    //return List(ctx.mkEq(xs(0), ctx.mkInt(0)), ctx.mkEq(xs(1), ctx.mkInt(1)));
     return List(ctx.mkBool(true));
   }
 
   def transition(xs:List[z3.ArithExpr]):List[z3.ArithExpr] = {
-    //return List(xs(1), ctx.mkAdd(xs(0), xs(1)));
-    //return List(ctx.mkAdd(xs(0), ctx.mkInt(1)), ctx.mkAdd(xs(0), xs(1)))
     return List(xs(0), xs(1), ctx.mkITE(ctx.mkDistinct(xs(1), ctx.mkInt(0)),ctx.mkInt(1),xs(0)).asInstanceOf[z3.ArithExpr]);
   }
 }
@@ -199,7 +162,7 @@ class CheckModel(){
       trx = ctx.mkAnd(trx, ctx.mkEq(xsp(i), xst(i))).simplify().asInstanceOf[z3.BoolExpr];
     }
 
-    solver.add(bad);
+    solver.add(ctx.mkNot(bad));
     solver.add(trx);
     solver.add(bad_proofob);
 
@@ -293,103 +256,58 @@ class CheckModel(){
     var m = new TransitionSystem("", ctx);
     var msc = new SelfComposedTransitionSystem(m, ctx);
 
-    var xs = msc.variables;
+    z3.Global.setParameter("fixedpoint.engine", "pdr")
+    val fp = ctx.mkFixedpoint();
+    val params = ctx.mkParams();
+    params.add("fixedpoint.engine", "spcaer");
+    fp.setParameters(params);
+
+    val sorts = msc.sorts;
+    val range = 0 until sorts.size toList;
+    var xs = range.map(i=>ctx.mkBound(i, sorts(i)).asInstanceOf[z3.ArithExpr]);
     var xst = msc.transition(xs);
-    var xsp = msc.addsuffix("prime");
+    val invDecl = ctx.mkFuncDecl("inv", sorts, ctx.mkBoolSort());
+    val errDecl = ctx.mkFuncDecl("error", Array[z3.Sort](), ctx.mkBoolSort());
+    var symbols = new Array[z3.Symbol](xs.size)
+    for(i<- 0 until xs.size){
+      symbols(i) = ctx.mkSymbol(i).asInstanceOf[z3.Symbol];
+    }
+    fp.registerRelation(invDecl);
+    fp.registerRelation(errDecl);
+    // for(x<-xs:::xsp){
+    //   fp.declareVar(x);
+    // }
 
-    var bad = ctx.mkAnd(msc.bad_sc(xs):_*).simplify().asInstanceOf[z3.BoolExpr];
-    var init = ctx.mkAnd(msc.initialize(xs):_*).simplify().asInstanceOf[z3.BoolExpr];
-    var check = ctx.mkAnd(init, bad).simplify().asInstanceOf[z3.BoolExpr];
+    var qId = 0;
+    var skId = 0;
 
-    var solver = ctx.mkSolver();
-
-    solver.push();
-    solver.add(check);
-    var rinit = solver.check();
-    solver.pop();
-    assert(rinit == z3.Status.UNSATISFIABLE)
-
-    solver.push();
-
-    var bad_proofob = ctx.mkAnd(msc.bad_sc(xsp):_*).simplify().asInstanceOf[z3.BoolExpr];
-    var trx = ctx.mkBool(true);
-    for (i <- 0 until msc.arity){
-      trx = ctx.mkAnd(trx, ctx.mkEq(xsp(i), xst(i))).simplify().asInstanceOf[z3.BoolExpr];
+    def createForAll(sorts:Array[z3.Sort], symbols:Array[z3.Symbol], e:z3.Expr):z3.BoolExpr = {
+      qId +=1;
+      skId +=1;
+      ctx.mkForall(sorts, symbols, e, 0, Array[z3.Pattern](), Array[z3.Expr](), ctx.mkSymbol(qId), ctx.mkSymbol(skId))
     }
 
-    solver.add(bad);
-    solver.add(trx);
-    solver.add(bad_proofob);
+    val initCond = ctx.mkAnd(msc.initialize(xs):_*);
+    val invxs = invDecl.apply(xs:_*).asInstanceOf[z3.BoolExpr];
+    var initRule = ctx.mkImplies(initCond, invxs);
+    initRule = createForAll(sorts, symbols, initRule);
 
-    var n = xs.size/2;
-    var unsafe = false;
+    val trxAfter = invDecl.apply(xst:_*).asInstanceOf[z3.BoolExpr];
+    var trxRule = ctx.mkImplies(invxs, trxAfter);
+    trxRule = createForAll(sorts, symbols, trxRule);
 
-    breakable{
-      while(solver.check() == z3.Status.SATISFIABLE){
-        breakable{
-          var model = solver.getModel();
-          var xm = xs.map(xsi => model.eval(xsi, true))
-          val range = 0 until xm1.size toList;
-          var bad1 = (xs1:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs1(i), xm1(i))))):_*));
-          var bad2 = (xs2:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs2(i), xm2(i))))):_*));
+    val badxs = ctx.mkAnd(msc.bad_sc(xs):_*);
+    val badInv = ctx.mkAnd(badxs, invxs);
+    var badRule = ctx.mkImplies(badInv, errDecl.apply().asInstanceOf[z3.BoolExpr]);
+    badRule = createForAll(sorts, symbols, badRule);
 
-          println("xm1", xm1)
-          println("xm2", xm2)
-          // These 3 values are returned by the getLength function
-          var (r1:Any, arg1:List[z3.Expr], expr1:z3.BoolExpr, length:Int) = getLength(m, bad1, ctx);
-          println("length", length)
-          println("r1", r1)
-          println("arg1", arg1)
-          println("expr1", expr1)
+    fp.addRule(initRule, ctx.mkSymbol("initRule"));
+    fp.addRule(trxRule, ctx.mkSymbol("trxRule"));
+    fp.addRule(badRule, ctx.mkSymbol("badRule"));
+    println("fp", fp.toString)
+    val rfp = fp.query(Array(errDecl));
 
-          if(r1 == z3.Status.UNSATISFIABLE){
-            // Can we work without the need to substitute?
-            var xstemp = xs.slice(0, xs.size/2);
-            var p1 = expr1;
-            for (i <- 0 until xs.size/2){
-              p1 = p1.substitute(arg1(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
-            }
-            xstemp = xs.slice(xs.size/2, xs.size);
-            var p2 = expr1;
-            for (i <- 0 until xs.size/2){
-              p2 = p2.substitute(arg1(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
-            }
-            solver.add(p1);
-            solver.add(p2);
-            break;
-          }
-          // var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
-          var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, length, ctx);
-
-          println("r2", r2)
-          println("arg2", arg2)
-          expr2either match{
-            case Left(expr2Inter) => {
-              var expr2Array = expr2Inter.interp;
-              println("expr2", expr2Array(0))
-              println("xs", xs)
-              var p = expr2Array(0);
-              for (i <- 0 until xs.size){
-                p = p.substitute(arg2(i), xs(i)).asInstanceOf[z3.BoolExpr];
-              }
-              println("p", p)
-              solver.add(p);
-              println("solver.check", solver.check())
-              break;
-            }
-            case Right(None) => {
-              unsafe = true;
-              break;
-            }
-          }
-        }
-        if(unsafe == true){
-          break;
-        }
-      }
-    }
-
-    if(unsafe == true){
+    if(rfp == z3.Status.SATISFIABLE){
       println("UNSAFE");
     }
     else{
