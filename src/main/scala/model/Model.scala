@@ -219,6 +219,119 @@ class CheckModel(){
     }
   }
 
+  def relationalInductionBasic(){
+
+    val cfg = new HashMap[String, String]();
+    cfg.put("model", "true");
+    cfg.put("proof", "true");
+    val ctx = z3.InterpolationContext.mkContext(cfg); 
+    var m = new TransitionSystem("", ctx);
+    var msc = new SelfComposedTransitionSystem(m, ctx);
+
+    var xs = msc.variables;
+    var xst = msc.transition(xs);
+    var xsp = msc.addsuffix("prime");
+
+    var bad = ctx.mkAnd(msc.bad_sc(xs):_*).simplify().asInstanceOf[z3.BoolExpr];
+    var init = ctx.mkAnd(msc.initialize(xs):_*).simplify().asInstanceOf[z3.BoolExpr];
+    var check = ctx.mkAnd(init, bad).simplify().asInstanceOf[z3.BoolExpr];
+
+    var solver = ctx.mkSolver();
+
+    solver.push();
+    solver.add(check);
+    var rinit = solver.check();
+    solver.pop();
+    assert(rinit == z3.Status.UNSATISFIABLE)
+
+    solver.push();
+
+    var bad_proofob = ctx.mkAnd(msc.bad_sc(xsp):_*).simplify().asInstanceOf[z3.BoolExpr];
+    var trx = ctx.mkBool(true);
+    for (i <- 0 until msc.arity){
+      trx = ctx.mkAnd(trx, ctx.mkEq(xsp(i), xst(i))).simplify().asInstanceOf[z3.BoolExpr];
+    }
+
+    solver.add(bad);
+    solver.add(trx);
+    solver.add(bad_proofob);
+
+    var n = xs.size/2;
+    var unsafe = false;
+
+    breakable{
+      while(solver.check() == z3.Status.SATISFIABLE){
+        breakable{
+          var model = solver.getModel();
+          var xm = xs.map(xsi => model.eval(xsi, true))
+          val range = 0 until xm1.size toList;
+          var bad1 = (xs1:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs1(i), xm1(i))))):_*));
+          var bad2 = (xs2:List[z3.ArithExpr]) => List(ctx.mkAnd((range.map((i=>ctx.mkEq(xs2(i), xm2(i))))):_*));
+
+          println("xm1", xm1)
+          println("xm2", xm2)
+          // These 3 values are returned by the getLength function
+          var (r1:Any, arg1:List[z3.Expr], expr1:z3.BoolExpr, length:Int) = getLength(m, bad1, ctx);
+          println("length", length)
+          println("r1", r1)
+          println("arg1", arg1)
+          println("expr1", expr1)
+
+          if(r1 == z3.Status.UNSATISFIABLE){
+            // Can we work without the need to substitute?
+            var xstemp = xs.slice(0, xs.size/2);
+            var p1 = expr1;
+            for (i <- 0 until xs.size/2){
+              p1 = p1.substitute(arg1(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
+            }
+            xstemp = xs.slice(xs.size/2, xs.size);
+            var p2 = expr1;
+            for (i <- 0 until xs.size/2){
+              p2 = p2.substitute(arg1(i), xstemp(i)).asInstanceOf[z3.BoolExpr];
+            }
+            solver.add(p1);
+            solver.add(p2);
+            break;
+          }
+          // var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, xm1(0).toString().toInt+1, ctx);
+          var (r2:Any, arg2:List[z3.Expr], expr2either:Either[z3.InterpolationContext#ComputeInterpolantResult, None.type]) = checkLength(m, msc, bad2, length, ctx);
+
+          println("r2", r2)
+          println("arg2", arg2)
+          expr2either match{
+            case Left(expr2Inter) => {
+              var expr2Array = expr2Inter.interp;
+              println("expr2", expr2Array(0))
+              println("xs", xs)
+              var p = expr2Array(0);
+              for (i <- 0 until xs.size){
+                p = p.substitute(arg2(i), xs(i)).asInstanceOf[z3.BoolExpr];
+              }
+              println("p", p)
+              solver.add(p);
+              println("solver.check", solver.check())
+              break;
+            }
+            case Right(None) => {
+              unsafe = true;
+              break;
+            }
+          }
+        }
+        if(unsafe == true){
+          break;
+        }
+      }
+    }
+
+    if(unsafe == true){
+      println("UNSAFE");
+    }
+    else{
+      println("SAFE");
+    }
+  }
+
   def getLength(m:TransitionSystem, bad:List[z3.ArithExpr]=>List[z3.BoolExpr], ctx:z3.Context):Tuple4[Any, List[z3.Expr], z3.BoolExpr, Int] = {
     z3.Global.setParameter("fixedpoint.engine", "pdr")
     val fp = ctx.mkFixedpoint();
